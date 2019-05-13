@@ -8,7 +8,7 @@ HEIGHT = 45 * Y_TILES
 FRAME_WIDTH = 300
 FRAME_HEIGHT = 300
 BUTTON_WIDTH = FRAME_WIDTH // X_TILES // 100
-BUTTON_HEIGTH = FRAME_HEIGHT // Y_TILES // 100
+BUTTON_HEIGHT = FRAME_HEIGHT // Y_TILES // 100
 
 SHIFTS = ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1))
 
@@ -110,9 +110,25 @@ class Fleet:
                         button_set[x_pos][ship.y]['bg'] = self.colour
 
 
+def refresh():
+    global player, taken, button_set
+    taken = [[False for _ in range(Y_TILES)] for _ in range(X_TILES)]
+    for button_string in button_set:
+        for button in button_string:
+            button.config(bg='Grey', state='active')
+    player = Fleet(player.colour)
+
+
 def click_logic(button, x, y):
     if taken[x][y]:
         button['bg'] = 'Red'
+        single = not check_tiles_around(x, y)
+        if single:
+            for x_shift, y_shift in SHIFTS:
+                shifted_x = x + x_shift
+                shifted_y = y + y_shift
+                if tile_exists(shifted_x, shifted_y):
+                    button_set[shifted_x][shifted_y].config(bg='Cyan', state='disabled')
     else:
         button['bg'] = 'Cyan'
     button['state'] = 'disabled'
@@ -124,7 +140,7 @@ root.geometry('{}x{}'.format(HEIGHT, WIDTH))
 frame = tk.Frame(root, width=FRAME_WIDTH, height=FRAME_HEIGHT)
 frame.place(relx=0.6, rely=0.5, anchor='center')
 
-button_set = [[tk.Button(master=frame, bg='Grey', bd=1, width=BUTTON_WIDTH, height=BUTTON_HEIGTH)
+button_set = [[tk.Button(master=frame, bg='Grey', bd=1, width=BUTTON_WIDTH, height=BUTTON_HEIGHT)
                for _ in range(Y_TILES)] for _ in range(X_TILES)]
 
 for x in range(X_TILES):
@@ -132,16 +148,18 @@ for x in range(X_TILES):
         button_set[x][y].config(command=lambda i=x, j=y: click_logic(button_set[i][j], i, j))
         button_set[x][y].grid(row=x, column=y)
 
-# Логика
-
 taken = [[False for _ in range(Y_TILES)] for _ in range(X_TILES)]
 
-player1 = Fleet('yellow')
+player = Fleet('yellow')
 
-hide_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1, command=player1.hide, text='Hide')
+hide_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1, command=player.hide, text='Hide')
 hide_button.place(relx=0.05, rely=0.1)
 
-reveal_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1, command=player1.reveal, text='Reveal')
+reveal_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1, command=player.reveal, text='Reveal')
 reveal_button.place(relx=0.05, rely=0.3)
+
+refresh_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1,
+                           command=refresh, text='Refresh')
+refresh_button.place(relx=0.05, rely=0.5)
 
 tk.mainloop()
