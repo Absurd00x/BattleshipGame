@@ -1,17 +1,26 @@
 import tkinter as tk
+import shelve
 from random import randint
+from time import sleep
 
 X_TILES = 10
 Y_TILES = 10
-WIDTH = 35 * X_TILES
-HEIGHT = 45 * Y_TILES
+WIDTH = 45 * X_TILES
+HEIGHT = 35 * Y_TILES
 FRAME_WIDTH = 300
-FRAME_HEIGHT = 300
+FRAME_HEIGHT = 400
 BUTTON_WIDTH = FRAME_WIDTH // X_TILES // 100
 BUTTON_HEIGHT = FRAME_HEIGHT // Y_TILES // 100
-SHIP_TYPES = 4 + 1
+SHIP_TYPES = 4
+TOTAL_PARTS = SHIP_TYPES * (SHIP_TYPES + 1) * (SHIP_TYPES + 2) / 6  # Shout-out to Ivangelie
 HORIZONTAL = 'horizontal'
 VERTICAL = 'vertical'
+INPUT_NODES = 28
+HIDDEN_NODES = 100
+OUTPUT_NODES = 1
+LEARNING_RATE = 0.3
+DELAY = 0  # 0.0625
+BOARDS_TO_SOLVE = 16200
 
 SHIFTS = ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1))
 
@@ -37,10 +46,11 @@ class Fleet:
         self.grid = grid
         self.ships = []
         self.colour = colour
-        for number in range(1, SHIP_TYPES):
-            self.place_ship(SHIP_TYPES - number, colour, number)
+        for number in range(1, SHIP_TYPES + 1):
+            self.place_ship(SHIP_TYPES - number + 1, number)
+        self.parts_alive = TOTAL_PARTS
 
-    def place_ship(self, size, colour, to_place):
+    def place_ship(self, size, to_place):
 
         placed = 0
 
@@ -54,14 +64,12 @@ class Fleet:
 
                 # Сначала проверяем - не задеваем ли мы другой корабль такой постановкой
                 for y in range(y_pos, y_pos + size):
-                    replace = self.grid.check_tiles_around(x_pos, y)
+                    replace = (self.grid.check_tiles_around(x_pos, y)
+                               or self.grid.taken[x_pos][y])
                     if replace:
                         break
                 if not replace:
-                    # print('Ship of size {} at:'.format(size))
                     for y in range(y_pos, y_pos + size):
-                        # print(x_pos, y)
-                        self.grid.cells[x_pos][y]['bg'] = colour
                         self.grid.taken[x_pos][y] = True
 
             elif rotation is VERTICAL:
@@ -70,17 +78,17 @@ class Fleet:
 
                 # Проверка
                 for x in range(x_pos, x_pos + size):
-                    replace = self.grid.check_tiles_around(x, y_pos)
+                    replace = (self.grid.check_tiles_around(x, y_pos)
+                               or self.grid.taken[x][y_pos])
                     if replace:
                         break
                 if not replace:
-                    # print('Ship of size {} at:'.format(size))
                     for x in range(x_pos, x_pos + size):
-                        self.grid.cells[x][y_pos]['bg'] = colour
                         self.grid.taken[x][y_pos] = True
 
             if not replace:
                 self.ships.append(Ship(x_pos, y_pos, size, rotation))
+                root.update()
                 placed += 1
 
     def hide(self):
@@ -115,7 +123,7 @@ def tile_exists(x, y):
 
 
 class Grid:
-    def __init__(self):
+    def __init__(self, player_colour):
         self.cells = [[tk.Button(master=frame, bg='Grey', bd=1, width=BUTTON_WIDTH, height=BUTTON_HEIGHT)
                        for _ in range(Y_TILES)] for _ in range(X_TILES)]
 
@@ -125,7 +133,7 @@ class Grid:
             for y in range(Y_TILES):
                 self.cells[x][y].config(command=lambda i=x, j=y: self.click_logic(i, j))
                 self.cells[x][y].grid(row=x, column=y)
-        self.players = []
+        self.player = Fleet(self, player_colour)
 
     def check_tiles_around(self, x, y):
         for x_shift, y_shift in SHIFTS:
@@ -137,55 +145,186 @@ class Grid:
         return False
 
     def click_logic(self, i, j):
-        self.cells[i][j]['text'] = 'i:{} j:{}'.format(i, j)
         if self.taken[i][j]:
             self.cells[i][j]['bg'] = 'Red'
-            single = not self.check_tiles_around(i, j)
-            if single:
-                for i_shift, j_shift in SHIFTS:
-                    shifted_i = i + i_shift
-                    shifted_j = j + j_shift
-                    if tile_exists(shifted_i, shifted_j):
-                        self.cells[shifted_i][shifted_j].config(bg='Cyan', state='disabled')
+            self.player.parts_alive -= 1
+            # Логика по которой нельзя кликать на клетки, на которых
+            # в принципе не может быть корабля
+            # single = not self.check_tiles_around(i, j)
+            # if single:
+            #     for i_shift, j_shift in SHIFTS:
+            #         shifted_i = i + i_shift
+            #         shifted_j = j + j_shift
+            #         if tile_exists(shifted_i, shifted_j):
+            #             self.cells[shifted_i][shifted_j].config(bg='Cyan', state='disabled')
         else:
             self.cells[i][j]['bg'] = 'Cyan'
         self.cells[i][j]['state'] = 'disabled'
 
-    def add_player(self, colour):
-        self.players.append(Fleet(self, colour))
-
     def refresh(self):
-        players_buff = self.players
-        self.__init__()
-        # После повторной инициализации лист игроков очищается
-        for player in players_buff:
-            self.add_player(player.colour)
+        self.__init__(self.player.colour)
         # Нужно говорить программе какого именно игрока прятать и показывать
         # Без этих двух строчек снизу кнопка refresh работает как кнопка hide
-        hide_button['command'] = self.players[0].hide
-        reveal_button['command'] = self.players[0].reveal
+        hide_button['command'] = self.player.hide
+        reveal_button['command'] = self.player.reveal
+
+# Логика нейронки
+
+
+def train_neural_network():
+    board = 0
+    while board < BOARDS_TO_SOLVE:
+        solve_button.invoke()
+        refresh_button.invoke()
+        board += 1
+
+
+def solve_with_neural_network(field):
+    # Достаем нейронку из файла
+    file = shelve.open('weights')
+    nn = file['nn']
+    """
+    Формируем вход для нейронки я ей показываю:
+    Подбитые корабли вокруг клетки
+    Неактивные клетки вокруг клетки
+    Расстояния до ближайшего подбитого корабля
+    Расстояния до ближайших неактивных клеток
+    Расстояния до границ экрана
+    Нейронка отдельно обрабатывает каждую клетку
+    """
+    while field.player.parts_alive > 0:
+        nn_input = None
+        nn_answer = (None, None)
+        maximum_confidence = 0
+        for i in range(X_TILES):
+            for j in range(Y_TILES):
+                if field.cells[i][j]['bg'] == 'Grey':
+
+                    # Ищем корабли вокруг клетки
+
+                    ships = []
+                    inactive_cells = []
+                    for i_shift, j_shift in SHIFTS:
+                        shifted_i = i + i_shift
+                        shifted_j = j + j_shift
+                        if not tile_exists(shifted_i, shifted_j):
+                            ships.append(0)
+                            inactive_cells.append(1)
+                        else:
+                            if field.cells[i][j]['bg'] == 'Red':
+                                ships.append(1)
+                            else:
+                                ships.append(0)
+                            if field.cells[i][j]['state'] == 'disabled':
+                                inactive_cells.append(1)
+                            else:
+                                inactive_cells.append(0)
+
+                    # Расстояния до границ экрана
+
+                    border_dist = [i + 1, j + 1, X_TILES - i - 1, Y_TILES - j - 1]
+
+                    # Расстояния до ближайшего подбитого корабля
+
+                    ships_dist = []
+
+                    # Если мы не найдем корабль, то будем считать, что он очень далеко
+
+                    dist = 100
+                    for x in range(i + 1, X_TILES):
+                        if field.cells[x][j]['bg'] == 'Red':
+                            dist = x - i - 1
+                            break
+                    ships_dist.append(dist)
+                    dist = 100
+                    for x in range(i - 1, -1, -1):
+                        if field.cells[x][j]['bg'] == 'Red':
+                            dist = i - x - 1
+                            break
+                    ships_dist.append(dist)
+                    dist = 100
+                    for y in range(j + 1, Y_TILES):
+                        if field.cells[i][y]['bg'] == 'Red':
+                            dist = y - j - 1
+                            break
+                    ships_dist.append(dist)
+                    dist = 100
+                    for y in range(j - 1, -1, -1):
+                        if field.cells[i][y]['bg'] == 'Red':
+                            dist = j - y - 1
+                            break
+                    ships_dist.append(dist)
+
+                    # Аналогично считаем расстояние до ближайшей неактивной клетки
+
+                    inactive_dist = []
+                    dist = 100
+                    for x in range(i + 1, X_TILES):
+                        if field.cells[x][j]['state'] == 'disabled':
+                            dist = x - i - 1
+                            break
+                    inactive_dist.append(dist)
+                    dist = 100
+                    for x in range(i - 1, -1, -1):
+                        if field.cells[x][j]['state'] == 'disabled':
+                            dist = i - x - 1
+                            break
+                    inactive_dist.append(dist)
+                    dist = 100
+                    for y in range(j + 1, Y_TILES):
+                        if field.cells[i][y]['state'] == 'disabled':
+                            dist = y - j - 1
+                            break
+                    inactive_dist.append(dist)
+                    dist = 100
+                    for y in range(j - 1, -1, -1):
+                        if field.cells[i][y]['state'] == 'disabled':
+                            dist = j - y - 1
+                            break
+                    inactive_dist.append(dist)
+
+                    # Сливаем все это добро в один массив - это и есть вход для нейронки
+
+                    nn_input = ships + inactive_cells + ships_dist + inactive_dist + border_dist
+                    confidence = nn.query(nn_input)
+                    if confidence > maximum_confidence:
+                        nn_answer = (i, j)
+                        maximum_confidence = confidence
+        field.click_logic(nn_answer[0], nn_answer[1])
+        correct_answer = [1] if field.cells[nn_answer[0]][nn_answer[1]]['bg'] == 'Red' else [0]
+        nn.train(nn_input, correct_answer)
+        sleep(DELAY)
+        root.update()
+    file['nn'] = nn
+    file.close()
 
 
 root = tk.Tk()
-root.geometry('{}x{}'.format(HEIGHT, WIDTH))
+root.geometry('{}x{}'.format(WIDTH, HEIGHT))
 
 frame = tk.Frame(root, width=FRAME_WIDTH, height=FRAME_HEIGHT)
 frame.place(relx=0.6, rely=0.5, anchor='center')
 
-battlefield = Grid()
-
-battlefield.add_player('yellow')
+battlefield = Grid('yellow')
 
 hide_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1,
-                        command=battlefield.players[0].hide, text='Hide')
-hide_button.place(relx=0.05, rely=0.1)
+                        command=battlefield.player.hide, text='Hide')
+hide_button.place(relx=0.05, rely=0.05)
 
 reveal_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1,
-                          command=battlefield.players[0].reveal, text='Reveal')
-reveal_button.place(relx=0.05, rely=0.3)
+                          command=battlefield.player.reveal, text='Reveal')
+reveal_button.place(relx=0.05, rely=0.25)
 
 refresh_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1,
                            command=battlefield.refresh, text='Refresh')
-refresh_button.place(relx=0.05, rely=0.5)
+refresh_button.place(relx=0.05, rely=0.45)
+
+solve_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1,
+                         command=lambda field=battlefield: solve_with_neural_network(field), text='Solve')
+solve_button.place(relx=0.05, rely=0.65)
+
+train_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1,
+                         command=train_neural_network, text='Train')
+train_button.place(relx=0.05, rely=0.85)
 
 tk.mainloop()
