@@ -9,6 +9,7 @@
 import tkinter as tk
 import shelve
 import neuralnetwork
+import gc
 from random import randint
 from time import sleep
 
@@ -39,8 +40,8 @@ VERTICAL = 'vertical'
 
 # Neural network parameters
 
-INPUT_NODES = 28
-HIDDEN_NODES = 20
+INPUT_NODES = 8
+HIDDEN_NODES = 30
 OUTPUT_NODES = 1
 LEARNING_RATE = 0.7
 DELAY = 0  # 0.0625
@@ -112,7 +113,6 @@ class Fleet:
 
             if not replace:
                 self.ships.append(Ship(x_pos, y_pos, size, rotation))
-                root.update()
                 placed += 1
 
     def hide(self):
@@ -173,6 +173,7 @@ class Grid:
         if self.taken[i][j]:
             self.cells[i][j]['bg'] = 'Red'
             self.player.parts_alive -= 1
+            self.cells[i][j]['text'] = 'i:{} j: {}'.format(i, j)
             # Логика по которой нельзя кликать на клетки, на которых
             # в принципе не может быть корабля
             # single = not self.check_tiles_around(i, j)
@@ -205,6 +206,7 @@ def train_neural_network(field):
         solve_with_neural_network(field)
         field.refresh()
         board += 1
+        gc.collect()
 
 
 def solve_with_neural_network(field):
@@ -227,100 +229,102 @@ def solve_with_neural_network(field):
         for i in range(X_TILES):
             for j in range(Y_TILES):
                 if field.cells[i][j]['bg'] == 'Grey':
-
                     # Ищем корабли вокруг клетки
-
                     ships = []
-                    inactive_cells = []
+                    #inactive_cells = []
                     for i_shift, j_shift in SHIFTS:
                         shifted_i = i + i_shift
                         shifted_j = j + j_shift
                         if not tile_exists(shifted_i, shifted_j):
-                            ships.append(0)
-                            inactive_cells.append(1)
+                            ships.append(0.01)
+                            #inactive_cells.append(0.99)
                         else:
-                            if field.cells[i][j]['bg'] == 'Red':
-                                ships.append(1)
+                            if field.cells[shifted_i][shifted_j]['bg'] == 'Red':
+                                ships.append(0.99)
                             else:
-                                ships.append(0)
-                            if field.cells[i][j]['state'] == 'disabled':
-                                inactive_cells.append(1)
-                            else:
-                                inactive_cells.append(0)
+                                ships.append(0.01)
+                            #if field.cells[shifted_i][shifted_j]['state'] == 'disabled':
+                            #    inactive_cells.append(0.99)
+                            #else:
+                            #    inactive_cells.append(0.01)
 
                     # Расстояния до границ экрана
-
+                    """
                     border_dist = [i, j, X_TILES - i - 1, Y_TILES - j - 1]
 
                     # Расстояния до ближайшего подбитого корабля
 
                     ships_dist = []
 
-                    # Если мы не найдем корабль, то будем считать, что он очень далеко
+                    # Если мы не найдем корабль, то будем считать, что он находится за полем
 
-                    dist = 100
+                    dist = 10
                     for x in range(i + 1, X_TILES):
                         if field.cells[x][j]['bg'] == 'Red':
                             dist = x - i - 1
                             break
-                    ships_dist.append(dist)
-                    dist = 100
+                    ships_dist.append(dist / 10)
+                    dist = 10
                     for x in range(i - 1, -1, -1):
                         if field.cells[x][j]['bg'] == 'Red':
                             dist = i - x - 1
                             break
-                    ships_dist.append(dist)
-                    dist = 100
+                    ships_dist.append(dist / 10)
+                    dist = 10
                     for y in range(j + 1, Y_TILES):
                         if field.cells[i][y]['bg'] == 'Red':
                             dist = y - j - 1
                             break
-                    ships_dist.append(dist)
-                    dist = 100
+                    ships_dist.append(dist / 10)
+                    dist = 10
                     for y in range(j - 1, -1, -1):
                         if field.cells[i][y]['bg'] == 'Red':
                             dist = j - y - 1
                             break
-                    ships_dist.append(dist)
+                    ships_dist.append(dist / 10)
 
                     # Аналогично считаем расстояние до ближайшей неактивной клетки
 
                     inactive_dist = []
-                    dist = 100
+                    dist = 10
                     for x in range(i + 1, X_TILES):
                         if field.cells[x][j]['state'] == 'disabled':
                             dist = x - i - 1
                             break
-                    inactive_dist.append(dist)
-                    dist = 100
+                    inactive_dist.append(dist / 10)
+                    dist = 10
                     for x in range(i - 1, -1, -1):
                         if field.cells[x][j]['state'] == 'disabled':
                             dist = i - x - 1
                             break
-                    inactive_dist.append(dist)
-                    dist = 100
+                    inactive_dist.append(dist / 10)
+                    dist = 10
                     for y in range(j + 1, Y_TILES):
                         if field.cells[i][y]['state'] == 'disabled':
                             dist = y - j - 1
                             break
-                    inactive_dist.append(dist)
-                    dist = 100
+                    inactive_dist.append(dist / 10)
+                    dist = 10
                     for y in range(j - 1, -1, -1):
                         if field.cells[i][y]['state'] == 'disabled':
                             dist = j - y - 1
                             break
-                    inactive_dist.append(dist)
-
+                    inactive_dist.append(dist / 10)
+                    """
                     # Сливаем все это добро в один массив - это и есть вход для нейронки
 
-                    nn_input = ships + inactive_cells + ships_dist + inactive_dist + border_dist
+                    nn_input = ships# + inactive_cells + ships_dist + inactive_dist + border_dist
                     confidence = nn.query(nn_input)
                     if confidence > maximum_confidence:
                         nn_answer = (i, j)
                         maximum_confidence = confidence
+                    field.cells[i][j]['bg'] = 'Grey'
+                    field.cells[i][j]['text'] = '{}%'.format(int(confidence * 100))
+                    root.update()
         field.click_logic(nn_answer[0], nn_answer[1])
         correct_answer = [1] if field.cells[nn_answer[0]][nn_answer[1]]['bg'] == 'Red' else [0]
         nn.train(nn_input, correct_answer)
+        field.cells[nn_answer[0]][nn_answer[1]]['text'] = '{}%'.format(int(maximum_confidence * 100))
         sleep(DELAY)
         root.update()
     file['nn'] = nn
