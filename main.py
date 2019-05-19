@@ -1,7 +1,10 @@
 import tkinter as tk
 import shelve
+import neuralnetwork
 from random import randint
 from time import sleep
+
+# Field parameters
 
 X_TILES = 10
 Y_TILES = 10
@@ -9,20 +12,33 @@ WIDTH = 45 * X_TILES
 HEIGHT = 35 * Y_TILES
 FRAME_WIDTH = 300
 FRAME_HEIGHT = 400
-BUTTON_WIDTH = FRAME_WIDTH // X_TILES // 100
-BUTTON_HEIGHT = FRAME_HEIGHT // Y_TILES // 100
+CELL_WIDTH = FRAME_WIDTH // X_TILES // 100
+CELL_HEIGHT = FRAME_HEIGHT // Y_TILES // 100
+
+# Button parameters
+
+BUTTON_COLOUR = 'Grey'
+BUTTON_HEIGHT = 3
+BUTTON_WIDTH = 6
+BUTTON_BORDER = 1
+
+# Ship parameters
+
 SHIP_TYPES = 4
 TOTAL_PARTS = SHIP_TYPES * (SHIP_TYPES + 1) * (SHIP_TYPES + 2) / 6  # Shout-out to Ivangelie
 HORIZONTAL = 'horizontal'
 VERTICAL = 'vertical'
-INPUT_NODES = 28
-HIDDEN_NODES = 100
-OUTPUT_NODES = 1
-LEARNING_RATE = 0.3
-DELAY = 0  # 0.0625
-BOARDS_TO_SOLVE = 16200
 
-SHIFTS = ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1))
+# Neural network parameters
+
+INPUT_NODES = 28
+HIDDEN_NODES = 20
+OUTPUT_NODES = 1
+LEARNING_RATE = 0.7
+DELAY = 0  # 0.0625
+BOARDS_TO_SOLVE = 100
+
+SHIFTS = ((-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1))
 
 #
 # Корабль
@@ -123,8 +139,9 @@ def tile_exists(x, y):
 
 
 class Grid:
-    def __init__(self, player_colour):
-        self.cells = [[tk.Button(master=frame, bg='Grey', bd=1, width=BUTTON_WIDTH, height=BUTTON_HEIGHT)
+    def __init__(self, frame, player_colour):
+        self.frame = frame
+        self.cells = [[tk.Button(master=frame, bg='Grey', bd=1, width=CELL_WIDTH, height=CELL_HEIGHT)
                        for _ in range(Y_TILES)] for _ in range(X_TILES)]
 
         self.taken = [[False for _ in range(Y_TILES)] for _ in range(X_TILES)]
@@ -162,20 +179,23 @@ class Grid:
         self.cells[i][j]['state'] = 'disabled'
 
     def refresh(self):
-        self.__init__(self.player.colour)
-        # Нужно говорить программе какого именно игрока прятать и показывать
-        # Без этих двух строчек снизу кнопка refresh работает как кнопка hide
-        hide_button['command'] = self.player.hide
-        reveal_button['command'] = self.player.reveal
+        self.__init__(self.frame, self.player.colour)
 
 # Логика нейронки
 
 
-def train_neural_network():
+def create_new_neural_network():
+    file = shelve.open('weights')
+    nn = neuralnetwork.NeuralNetwork(INPUT_NODES, HIDDEN_NODES, OUTPUT_NODES, LEARNING_RATE)
+    file['nn'] = nn
+    file.close()
+
+
+def train_neural_network(field):
     board = 0
     while board < BOARDS_TO_SOLVE:
-        solve_button.invoke()
-        refresh_button.invoke()
+        solve_with_neural_network(field)
+        field.refresh()
         board += 1
 
 
@@ -222,7 +242,7 @@ def solve_with_neural_network(field):
 
                     # Расстояния до границ экрана
 
-                    border_dist = [i + 1, j + 1, X_TILES - i - 1, Y_TILES - j - 1]
+                    border_dist = [i, j, X_TILES - i - 1, Y_TILES - j - 1]
 
                     # Расстояния до ближайшего подбитого корабля
 
@@ -302,29 +322,21 @@ def solve_with_neural_network(field):
 root = tk.Tk()
 root.geometry('{}x{}'.format(WIDTH, HEIGHT))
 
-frame = tk.Frame(root, width=FRAME_WIDTH, height=FRAME_HEIGHT)
-frame.place(relx=0.6, rely=0.5, anchor='center')
+fr = tk.Frame(root, width=FRAME_WIDTH, height=FRAME_HEIGHT)
+fr.place(relx=0.6, rely=0.5, anchor='center')
 
-battlefield = Grid('yellow')
+battlefield = Grid(fr, 'yellow')
 
-hide_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1,
-                        command=battlefield.player.hide, text='Hide')
-hide_button.place(relx=0.05, rely=0.05)
+UI_buttons = {'hide': tk.Button(text='Hide', command=lambda field=battlefield: field.player.hide()),
+              'reveal': tk.Button(text='Reveal', command=lambda field=battlefield: field.player.reveal()),
+              'refresh': tk.Button(text='Refresh', command=lambda field=battlefield: field.refresh()),
+              'solve': tk.Button(text='Solve', command=lambda field=battlefield: solve_with_neural_network(field)),
+              'train': tk.Button(text='Train', command=lambda field=battlefield: train_neural_network(field))}
 
-reveal_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1,
-                          command=battlefield.player.reveal, text='Reveal')
-reveal_button.place(relx=0.05, rely=0.25)
+for button in UI_buttons.values():
+    button.config(bg=BUTTON_COLOUR, width=BUTTON_WIDTH, height=BUTTON_HEIGHT, bd=BUTTON_BORDER)
 
-refresh_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1,
-                           command=battlefield.refresh, text='Refresh')
-refresh_button.place(relx=0.05, rely=0.45)
-
-solve_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1,
-                         command=lambda field=battlefield: solve_with_neural_network(field), text='Solve')
-solve_button.place(relx=0.05, rely=0.65)
-
-train_button = tk.Button(master=root, bg='Grey', width=6, height=3, bd=1,
-                         command=train_neural_network, text='Train')
-train_button.place(relx=0.05, rely=0.85)
+for button, indent in zip(UI_buttons.values(), range(len(UI_buttons))):
+    button.place(relx=0.05, rely=0.025 + 0.19 * indent)
 
 tk.mainloop()
