@@ -1,3 +1,11 @@
+# TODO:
+#  1) Neural network does not learn shit.
+#  2) There is a memory leak somewhere because after.
+#  like 10000 board this script takes the whole CPU core memory
+#  3) I definitely should implement genetic selection algorithm
+#  because there is nothing that punishes neural network for
+#  solving the grid in maximum possible amount of turns.
+
 import tkinter as tk
 import shelve
 import neuralnetwork
