@@ -65,6 +65,14 @@ class Ship:
 #
 
 
+class FitError(Exception):
+    """
+    An exception in case the program was unable to place all ships
+    """
+    def __init__(self):
+        super().__init__('Could not fit all the ships into battlefield')
+
+
 class Fleet:
     def __init__(self):
         self.ships = []
@@ -86,8 +94,12 @@ class Fleet:
     def place_ship(self, size, to_place):
 
         placed = 0
+        tries = 100
+        current_try = 0
 
         while placed < to_place:
+            if current_try == tries:
+                raise FitError
             replace = False
             x_pos, y_pos = None, None
             rotation = HORIZONTAL if randint(0, 1) else VERTICAL
@@ -119,9 +131,12 @@ class Fleet:
                     for x in range(x_pos, x_pos + size):
                         self.taken[x][y_pos] = True
 
+            current_try += 1
+
             if not replace:
                 self.ships.append(Ship(x_pos, y_pos, size, rotation))
                 placed += 1
+                current_try = 0
 
 #
 # Сетка
