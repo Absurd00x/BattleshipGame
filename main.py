@@ -43,6 +43,7 @@ INPUT_NODES = 28
 HIDDEN_NODES = 100
 OUTPUT_NODES = 1
 LEARNING_RATE = 0.0001
+HEURISTIC = []  #
 DELAY = 0  # 0.0625
 TRAINING = False
 ENTERTAIN = True
@@ -50,7 +51,7 @@ ENTERTAIN = True
 SHIFTS = ((-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1))
 
 #
-# Корабль
+# Ship
 #
 
 
@@ -62,7 +63,7 @@ class Ship:
         self.rotation = rotation
 
 #
-# Флот
+# Fleet
 #
 
 
@@ -140,7 +141,7 @@ class Fleet:
                 current_try = 0
 
 #
-# Сетка
+# Grid
 #
 
 
@@ -186,8 +187,8 @@ class Grid:
         if self.player.taken[i][j]:
             self.cells[i][j]['bg'] = 'Red'
             self.player.parts_alive -= 1
-            # Логика по которой нельзя кликать на клетки, на которых
-            # в принципе не может быть корабля
+            # Logic which restricts to click around
+            # destroyed ships
             # single = not self.check_tiles_around(i, j)
             # if single:
             #     for i_shift, j_shift in SHIFTS:
@@ -206,7 +207,7 @@ class Grid:
                 cell.destroy()
         self.__init__()
 
-# Логика нейронки
+# NN logic
 
 
 def create_new_neural_network():
@@ -237,18 +238,18 @@ def show_solution():
 
 
 def solve_with_neural_network():
-    # Достаем нейронку из файла
+    # Get NN from file
     with shelve.open('data') as file:
         nn = file['nn']
         solved = file['solved']
         """
-        Формируем вход для нейронки я ей показываю:
-        Подбитые корабли вокруг клетки
-        Неактивные клетки вокруг клетки
-        Расстояния до ближайшего подбитого корабля
-        Расстояния до ближайших неактивных клеток
-        Расстояния до границ экрана
-        Нейронка отдельно обрабатывает каждую клетку
+        What I show to NN:
+        Revealed damaged ships around a cell
+        Active cells around a cell
+        Distance to closest damaged ship 
+        Distance to closest inactive cells
+        Distance to borders
+        NN processes each cell separately
         """
         while battlefield.player.parts_alive > 0:
             nn_input = None
@@ -257,7 +258,7 @@ def solve_with_neural_network():
             for i in range(X_TILES):
                 for j in range(Y_TILES):
                     if battlefield.cells[i][j]['bg'] == 'Grey':
-                        # Ищем корабли вокруг клетки
+                        # Seek for damaged ships
                         ships = []
                         active_cells = []
                         for i_shift, j_shift in SHIFTS:
@@ -276,15 +277,11 @@ def solve_with_neural_network():
                                 else:
                                     active_cells.append(0.01)
 
-                        # Расстояния до границ экрана
-
                         border_dist = [(i + 1) / X_TILES, (j + 1) / Y_TILES, 1 - i / X_TILES, 1 - j / Y_TILES]
 
-                        # Расстояния до ближайшего подбитого корабля
-    
                         ships_dist = []
     
-                        # Если мы не найдем корабль, то будем считать, что он находится за полем
+                        # If there is no ship in some direction I suppose it is beyond the board
     
                         dist = 10
                         for x in range(i + 1, X_TILES):
@@ -310,8 +307,6 @@ def solve_with_neural_network():
                                 dist = j - y
                                 break
                         ships_dist.append(dist / 10)
-    
-                        # Аналогично считаем расстояние до ближайшей неактивной клетки
     
                         inactive_dist = []
                         dist = 10
@@ -339,7 +334,7 @@ def solve_with_neural_network():
                                 break
                         inactive_dist.append(dist / 10)
 
-                        # Сливаем все это добро в один массив - это и есть вход для нейронки
+                        # Merge all information to a list. It's NN input
 
                         nn_input = ships + active_cells + ships_dist + inactive_dist + border_dist
                         confidence = nn.query(nn_input)
