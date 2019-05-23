@@ -15,7 +15,7 @@ from time import sleep
 X_TILES = 10
 Y_TILES = 10
 WIDTH = 50 * X_TILES
-HEIGHT = 35 * Y_TILES
+HEIGHT = 37 * Y_TILES
 FRAME_WIDTH = 300
 FRAME_HEIGHT = 400
 CELL_WIDTH = FRAME_WIDTH // X_TILES // 100
@@ -39,12 +39,13 @@ PLAYER_COLOUR = 'Yellow'
 
 # Neural network parameters
 
-INPUT_NODES = 8
+INPUT_NODES = 28
 HIDDEN_NODES = 100
 OUTPUT_NODES = 1
-LEARNING_RATE = 0.00003
+LEARNING_RATE = 0.0001
 DELAY = 0  # 0.0625
-BOARDS_TO_SOLVE = 100
+TRAINING = False
+ENTERTAIN = True
 
 SHIFTS = ((-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1))
 
@@ -209,25 +210,37 @@ class Grid:
 
 
 def create_new_neural_network():
-    file = shelve.open('weights')
+    file = shelve.open('data')
     nn = neuralnetwork.NeuralNetwork(INPUT_NODES, HIDDEN_NODES, OUTPUT_NODES, LEARNING_RATE)
+    file['solved'] = 0
     file['nn'] = nn
     file.close()
 
 
 def train_neural_network():
-    board = 0
-    while board < BOARDS_TO_SOLVE:
+    global TRAINING
+    TRAINING = True
+    while TRAINING:
         solve_with_neural_network()
         battlefield.refresh()
         root.update()
-        board += 1
+
+
+def stop_training():
+    global TRAINING
+    TRAINING = False
+
+
+def show_solution():
+    global ENTERTAIN
+    ENTERTAIN = False if ENTERTAIN else True
 
 
 def solve_with_neural_network():
     # Достаем нейронку из файла
-    with shelve.open('weights') as file:
+    with shelve.open('data') as file:
         nn = file['nn']
+        solved = file['solved']
         """
         Формируем вход для нейронки я ей показываю:
         Подбитые корабли вокруг клетки
@@ -246,27 +259,27 @@ def solve_with_neural_network():
                     if battlefield.cells[i][j]['bg'] == 'Grey':
                         # Ищем корабли вокруг клетки
                         ships = []
-                        #inactive_cells = []
+                        active_cells = []
                         for i_shift, j_shift in SHIFTS:
                             shifted_i = i + i_shift
                             shifted_j = j + j_shift
                             if not tile_exists(shifted_i, shifted_j):
                                 ships.append(0.01)
-                                #inactive_cells.append(0.99)
+                                active_cells.append(0.01)
                             else:
                                 if battlefield.cells[shifted_i][shifted_j]['bg'] == 'Red':
                                     ships.append(0.99)
                                 else:
                                     ships.append(0.01)
-                                #if battlefield.cells[shifted_i][shifted_j]['state'] == 'disabled':
-                                #    inactive_cells.append(0.99)
-                                #else:
-                                #    inactive_cells.append(0.01)
+                                if battlefield.cells[shifted_i][shifted_j]['state'] == 'active':
+                                    active_cells.append(0.99)
+                                else:
+                                    active_cells.append(0.01)
 
                         # Расстояния до границ экрана
-                        """
-                        border_dist = [i, j, X_TILES - i - 1, Y_TILES - j - 1]
-    
+
+                        border_dist = [(i + 1) / X_TILES, (j + 1) / Y_TILES, 1 - i / X_TILES, 1 - j / Y_TILES]
+
                         # Расстояния до ближайшего подбитого корабля
     
                         ships_dist = []
@@ -276,25 +289,25 @@ def solve_with_neural_network():
                         dist = 10
                         for x in range(i + 1, X_TILES):
                             if battlefield.cells[x][j]['bg'] == 'Red':
-                                dist = x - i - 1
+                                dist = x - i
                                 break
                         ships_dist.append(dist / 10)
                         dist = 10
                         for x in range(i - 1, -1, -1):
                             if battlefield.cells[x][j]['bg'] == 'Red':
-                                dist = i - x - 1
+                                dist = i - x
                                 break
                         ships_dist.append(dist / 10)
                         dist = 10
                         for y in range(j + 1, Y_TILES):
                             if battlefield.cells[i][y]['bg'] == 'Red':
-                                dist = y - j - 1
+                                dist = y - j
                                 break
                         ships_dist.append(dist / 10)
                         dist = 10
                         for y in range(j - 1, -1, -1):
                             if battlefield.cells[i][y]['bg'] == 'Red':
-                                dist = j - y - 1
+                                dist = j - y
                                 break
                         ships_dist.append(dist / 10)
     
@@ -304,58 +317,64 @@ def solve_with_neural_network():
                         dist = 10
                         for x in range(i + 1, X_TILES):
                             if battlefield.cells[x][j]['state'] == 'disabled':
-                                dist = x - i - 1
+                                dist = x - i
                                 break
                         inactive_dist.append(dist / 10)
                         dist = 10
                         for x in range(i - 1, -1, -1):
                             if battlefield.cells[x][j]['state'] == 'disabled':
-                                dist = i - x - 1
+                                dist = i - x
                                 break
                         inactive_dist.append(dist / 10)
                         dist = 10
                         for y in range(j + 1, Y_TILES):
                             if battlefield.cells[i][y]['state'] == 'disabled':
-                                dist = y - j - 1
+                                dist = y - j
                                 break
                         inactive_dist.append(dist / 10)
                         dist = 10
                         for y in range(j - 1, -1, -1):
                             if battlefield.cells[i][y]['state'] == 'disabled':
-                                dist = j - y - 1
+                                dist = j - y
                                 break
                         inactive_dist.append(dist / 10)
-                        """
+
                         # Сливаем все это добро в один массив - это и есть вход для нейронки
 
-                        nn_input = ships# + inactive_cells + ships_dist + inactive_dist + border_dist
+                        nn_input = ships + active_cells + ships_dist + inactive_dist + border_dist
                         confidence = nn.query(nn_input)
                         if confidence > maximum_confidence:
                             nn_answer = (i, j)
                             maximum_confidence = confidence
                         battlefield.cells[i][j]['bg'] = 'Grey'
-                        root.update()
+                        if ENTERTAIN:
+                            root.update()
             battlefield.click_logic(nn_answer[0], nn_answer[1])
             correct_answer = [1] if battlefield.cells[nn_answer[0]][nn_answer[1]]['bg'] == 'Red' else [0]
             nn.train(nn_input, correct_answer)
             sleep(DELAY)
+        solved += 1
+        solved_label['text'] = 'Boards solved: {}'.format(solved)
         file['nn'] = nn
+        file['solved'] = solved
 
 
 root = tk.Tk()
 root.geometry('{}x{}'.format(WIDTH, HEIGHT))
 
 frame = tk.Frame(root, width=FRAME_WIDTH, height=FRAME_HEIGHT)
-frame.place(relx=0.69, rely=0.5, anchor='center')
+frame.place(relx=0.69, rely=0.45, anchor='center')
 
 battlefield = Grid()
 
-UI_buttons = {'hide': tk.Button(text='Hide', command=battlefield.hide),
-              'reveal': tk.Button(text='Reveal', command=battlefield.reveal),
-              'refresh': tk.Button(text='Refresh', command=battlefield.refresh),
-              'solve': tk.Button(text='Solve', command=solve_with_neural_network),
-              'train': tk.Button(text='Train', command=train_neural_network),
-              'new': tk.Button(text='Recreate\nNN', command=create_new_neural_network),
+UI_buttons = {'hide': tk.Button(text='Hide\nfleet', command=battlefield.hide),
+              'reveal': tk.Button(text='Reveal\nfleet', command=battlefield.reveal),
+              'refresh': tk.Button(text='Refresh\nboard', command=battlefield.refresh),
+              'solve': tk.Button(text='Solve\nboard', command=solve_with_neural_network),
+              'train': tk.Button(text='Train\nNN', command=train_neural_network),
+              'recreate': tk.Button(text='Recreate\nNN', command=create_new_neural_network),
+              'stop': tk.Button(text='Stop\ntraining', command=stop_training),
+              'show': tk.Button(text='Show\nsolution', command=show_solution),
               'exit': tk.Button(text='Exit', command=root.destroy)}
 
 for UI_button in UI_buttons.values():
@@ -366,6 +385,12 @@ buttons_matrix = [list(UI_buttons.values())[i:i+BUTTONS_PER_COLUMN]
 
 for column_index in range(len(buttons_matrix)):
     for row_index in range(len(buttons_matrix[column_index])):
-        buttons_matrix[column_index][row_index].place(relx=(0.02 + 0.16 * column_index), rely=(0.025 + 0.19 * row_index))
+        buttons_matrix[column_index][row_index].place(relx=(0.02 + 0.16 * column_index), rely=(0.03 + 0.19 * row_index))
+
+with shelve.open('data') as file:
+    boards_solved = file['solved']
+
+solved_label = tk.Label(text='Boards solved: {}'.format(boards_solved))
+solved_label.place(relx=0.6, rely=0.9)
 
 tk.mainloop()
