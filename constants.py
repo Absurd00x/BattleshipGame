@@ -60,8 +60,8 @@ MISS_COLOUR = 'Cyan'
 # Neural network parameters
 #
 
-INPUT_NODES = 10
-HIDDEN_NODES = 100
+INPUT_NODES = 14
+HIDDEN_NODES = 200
 OUTPUT_NODES = 1
 LEARNING_RATE = 0.00001
 
@@ -78,10 +78,8 @@ HEURISTIC_CENTER = [[(min(i + 1, X_TILES - i, SHIP_TYPES) +
 # x.x.x.x.x.x
 HEURISTIC_CHESS = [[0.99 if (i + j) % 2 == 0 else 0.01 for j in range(Y_TILES)] for i in range(X_TILES)]
 
-ENTERTAIN_DELAY = 0  # 0.0625
-CONFIDENCE_DELAY = 0  # 0.5
+CONFIDENCE_DELAY = 0.5
 TRAINING = False
-ENTERTAIN = False
 SHOW_CONFIDENCE = False
 FILE_NAME = 'data.txt'
 

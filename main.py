@@ -19,11 +19,6 @@ def stop_training():
     TRAINING = False
 
 
-def show_solution():
-    global ENTERTAIN
-    ENTERTAIN = False if ENTERTAIN else True
-
-
 class MyGUI:
     def __init__(self):
         self.root = tk.Tk()
@@ -44,12 +39,12 @@ class MyGUI:
         self.UI_buttons = {'stop': tk.Button(text='Stop\ntraining', command=stop_training),
                            'refresh': tk.Button(text='Refresh\nboard', command=self.battlefield.refresh),
                            'hide': tk.Button(text='Show\nfleet', command=self.battlefield.show_player),
-                           'confidence': tk.Button(text='Show\nconfidence', command=self.show_confidence),
+                           'confidence': tk.Button(text='Show\nsolution', command=self.show_solution),
                            'recreate': tk.Button(text='Recreate\nNN', command=self.create_new_neural_network),
                            'train': tk.Button(text='Train\nNN', command=self.train_neural_network),
                            'solve': tk.Button(text='Solve\nboard', command=self.solve_with_neural_network),
                            'results': tk.Button(text='Show\nresults', command=self.show_results),
-                           'show': tk.Button(text='Show\nsolution', command=show_solution),
+                           'show': tk.Button(text='Dummy'),
                            'exit': tk.Button(text='Exit', command=self.root.destroy)}
 
         self.buttons_matrix = [list(self.UI_buttons.values())[i:i + BUTTONS_PER_COLUMN]
@@ -79,9 +74,8 @@ class MyGUI:
             UI_button.config(width=width, height=height, bd=border, bg=colour)
 
     def show_results(self):
-        results = (self.neural_network_results.stored if len(self.neural_network_results.stored) else
-                   self.neural_network_results.buff)
-        games_played = [int(n * self.neural_network_results.power) for n in range(1, len(results) + 1)]
+        results = self.neural_network_results
+        games_played = [int(n * results.power) for n in range(1, len(results) + 1)]
         plt.plot(games_played, results)
         plt.title('Game history')
         plt.xlabel('Games played')
@@ -97,7 +91,7 @@ class MyGUI:
         nn = neuralnetwork.NeuralNetwork(INPUT_NODES, HIDDEN_NODES, OUTPUT_NODES, LEARNING_RATE)
         file['nn'] = nn
         file['solved'] = 0
-        file['results'] = []
+        file['results'] = CompressedList()
         self.neural_network = nn
         self.boards_solved = 0
         self.neural_network_results = CompressedList()
@@ -117,7 +111,7 @@ class MyGUI:
             file['solved'] = self.boards_solved
             file['results'] = self.neural_network_results
 
-    def show_confidence(self):
+    def show_solution(self):
         global SHOW_CONFIDENCE
         if SHOW_CONFIDENCE:
             SHOW_CONFIDENCE = False
@@ -162,7 +156,8 @@ class MyGUI:
                                 else:
                                     ships.append(0.01)
 
-                        nn_input = ships + [HEURISTIC_CENTER[i][j], HEURISTIC_CHESS[i][j]]
+                        nn_input = (ships + [HEURISTIC_CENTER[i][j], HEURISTIC_CHESS[i][j]]
+                                    + self.battlefield.player.destroyed)
                         confidence = float(self.neural_network.query(nn_input))
                         if confidence > maximum_confidence:
                             nn_answer = (i, j)
@@ -170,20 +165,17 @@ class MyGUI:
                         self.battlefield.cells[i][j]['bg'] = 'Grey'
                         if SHOW_CONFIDENCE:
                             self.battlefield.cells[i][j]['text'] = '{:.2f}%'.format(maximum_confidence * 100)
-                        if ENTERTAIN:
-                            self.root.update()
+            self.battlefield.click_logic(nn_answer[0], nn_answer[1])
             if SHOW_CONFIDENCE:
                 self.root.update()
                 sleep(CONFIDENCE_DELAY)
-            self.battlefield.click_logic(nn_answer[0], nn_answer[1])
             correct_answer = [1] if self.battlefield.cells[nn_answer[0]][nn_answer[1]]['bg'] == HIT_COLOUR else [0]
             self.neural_network.train(nn_input, correct_answer)
-            sleep(ENTERTAIN_DELAY)
 
         result = sum([sum([1 if cell['bg'] == MISS_COLOUR else 0
                       for cell in cell_row])
                       for cell_row in self.battlefield.cells])
-        self.neural_network_results.add(result)
+        self.neural_network_results.append(result)
         self.boards_solved += 1
         self.solved_label['text'] = 'Boards solved: {}'.format(self.boards_solved)
 

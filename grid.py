@@ -13,6 +13,7 @@ class Ship:
         self.y = y
         self.size = size
         self.rotation = rotation
+        self.health = size
 
 #
 # Fleet
@@ -35,9 +36,13 @@ class Fleet:
     def __init__(self):
         self.ships = []
         self.colour = PLAYER_COLOUR
-        self.taken = [[False for _ in range(Y_TILES)] for _ in range(X_TILES)]
+        # Displays ship size placed in a tile
+        self.taken = [[0 for _ in range(Y_TILES)] for _ in range(X_TILES)]
+        self.destroyed = [0.01 for _ in range(SHIP_TYPES)]
+        self.ship_number = 1
         for number in range(1, SHIP_TYPES + 1):
             self.place_ship(SHIP_TYPES - number + 1, number)
+        del self.ship_number
         self.parts_alive = TOTAL_PARTS
         self.shown = False
 
@@ -74,7 +79,7 @@ class Fleet:
                         break
                 if not replace:
                     for y in range(y_pos, y_pos + size):
-                        self.taken[x_pos][y] = True
+                        self.taken[x_pos][y] = self.ship_number
 
             elif rotation is VERTICAL:
                 x_pos = randint(0, X_TILES - size)
@@ -88,12 +93,13 @@ class Fleet:
                         break
                 if not replace:
                     for x in range(x_pos, x_pos + size):
-                        self.taken[x][y_pos] = True
+                        self.taken[x][y_pos] = self.ship_number
 
             current_try += 1
 
             if not replace:
                 self.ships.append(Ship(x_pos, y_pos, size, rotation))
+                self.ship_number += 1
                 placed += 1
                 current_try = 0
 
@@ -161,8 +167,14 @@ class Grid:
 
     def click_logic(self, i, j):
         if self.player.taken[i][j]:
+            ship_number = self.player.taken[i][j] - 1
+            ship_size = self.player.ships[ship_number].size
+            progress = {1: 0.25, 2: 0.33, 3: 0.5, 4: 1}
             self.cells[i][j]['bg'] = HIT_COLOUR
             self.player.parts_alive -= 1
+            self.player.ships[ship_number].health -= 1
+            if self.player.ships[ship_number].health == 0:
+                self.player.destroyed[ship_size - 1] += progress[ship_size]
         else:
             self.cells[i][j]['bg'] = MISS_COLOUR
         self.cells[i][j]['state'] = 'disabled'
