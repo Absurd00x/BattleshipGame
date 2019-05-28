@@ -174,7 +174,10 @@ class Grid:
             self.player.parts_alive -= 1
             self.player.ships[ship_number].health -= 1
             if self.player.ships[ship_number].health == 0:
-                self.player.destroyed[ship_size - 1] += progress[ship_size]
+                if self.player.destroyed[ship_size - 1] == 0.01:
+                    self.player.destroyed[ship_size - 1] = progress[ship_size]
+                else:
+                    self.player.destroyed[ship_size - 1] += progress[ship_size]
         else:
             self.cells[i][j]['bg'] = MISS_COLOUR
         self.cells[i][j]['state'] = 'disabled'
