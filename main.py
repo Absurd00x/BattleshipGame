@@ -1,9 +1,3 @@
-# TODO:
-#  1) Neural network does not learn shit.
-#  2) I definitely should implement genetic selection algorithm
-#  because there is nothing that punishes neural network for
-#  solving the grid in maximum possible amount of turns.
-
 import neuralnetwork
 import tkinter as tk
 import shelve
@@ -11,6 +5,7 @@ from complist import CompressedList
 from constants import *
 from grid import Grid, tile_exists
 from matplotlib import pyplot as plt
+from os import rename
 from time import sleep
 
 
@@ -23,6 +18,7 @@ class MyGUI:
     def __init__(self):
         self.root = tk.Tk()
         self.root_geometry(WIDTH, HEIGHT)
+        self.root.title('Battleship game')
 
         self.frame = tk.Frame(master=self.root, width=FRAME_WIDTH, height=FRAME_HEIGHT)
         self.battlefield = Grid(self.frame)
@@ -44,7 +40,7 @@ class MyGUI:
                            'train': tk.Button(text='Train\nNN', command=self.train_neural_network),
                            'solve': tk.Button(text='Solve\nboard', command=self.solve_with_neural_network),
                            'results': tk.Button(text='Show\nresults', command=self.show_results),
-                           'show': tk.Button(text='Dummy'),
+                           'show': tk.Button(text='System\nbutton', command=self.system_command),
                            'exit': tk.Button(text='Exit', command=self.root.destroy)}
 
         self.buttons_matrix = [list(self.UI_buttons.values())[i:i + BUTTONS_PER_COLUMN]
@@ -55,6 +51,10 @@ class MyGUI:
         self.place_buttons(X_INDENT, Y_INDENT)
 
         self.solved_label.place(relx=0.6, rely=0.9)
+
+    def system_command(self):
+        with shelve.open('./NN cemetery/config') as config:
+            config['solved'] = 4
 
     def root_geometry(self, width, height):
         screen_width = self.root.winfo_screenwidth()
@@ -73,43 +73,65 @@ class MyGUI:
         for UI_button in self.UI_buttons.values():
             UI_button.config(width=width, height=height, bd=border, bg=colour)
 
-    def show_results(self):
+    def draw_plot(self):
         results = self.neural_network_results
         games_played = [int(n * results.power) for n in range(1, len(results) + 1)]
         plt.plot(games_played, results)
         plt.title('Game history')
         plt.xlabel('Games played')
         plt.ylabel('Misses')
+
+    def show_results(self):
+        self.draw_plot()
         plt.show()
 
     #
     # NN logic
     #
 
+    def save_neural_network(self):
+        with shelve.open(FILE_NAME) as file:
+            file['nn'] = self.neural_network
+            file['solved'] = self.boards_solved
+            file['results'] = self.neural_network_results
+
     def create_new_neural_network(self):
-        file = shelve.open('data.txt')
-        nn = neuralnetwork.NeuralNetwork(INPUT_NODES, HIDDEN_NODES, OUTPUT_NODES, LEARNING_RATE)
-        file['nn'] = nn
-        file['solved'] = 0
-        file['results'] = CompressedList()
-        self.neural_network = nn
-        self.boards_solved = 0
-        self.neural_network_results = CompressedList()
-        self.solved_label['text'] = 'Boards solved: 0'
-        file.close()
+        self.save_neural_network()
+        if self.boards_solved >= 10000:
+            with shelve.open('./NN cemetery/config') as config:
+                nn_count = config['count']
+                self.draw_plot()
+                plt.savefig('./NN cemetery/{}_{}.png'.format(nn_count, self.boards_solved), format='png', dpi=100)
+                plt.clf()
+                rename('./{}'.format(FILE_NAME), './NN cemetery/{}_{}'.format(nn_count, self.neural_network_results[-1]))
+                config['count'] += 1
+        with shelve.open(FILE_NAME) as file:
+            nn = neuralnetwork.NeuralNetwork(INPUT_NODES, HIDDEN_NODES, OUTPUT_NODES, LEARNING_RATE)
+            file['nn'] = nn
+            file['solved'] = 0
+            file['results'] = CompressedList()
+            self.neural_network = nn
+            self.boards_solved = 0
+            self.neural_network_results = CompressedList()
+            self.solved_label['text'] = 'Boards solved: 0'
 
     def train_neural_network(self):
         global TRAINING
         TRAINING = True
+        games_until_autosave = 0
         while TRAINING:
+            if self.boards_solved >= MAXIMUM_GAMES:
+                TRAINING = False
+                break
+            if games_until_autosave >= GAMES_TO_AUTOSAVE:
+                self.save_neural_network()
+                games_until_autosave = 0
             self.solve_with_neural_network()
             self.battlefield.refresh()
+            games_until_autosave += 1
             self.root.update()
 
-        with shelve.open('data.txt') as file:
-            file['nn'] = self.neural_network
-            file['solved'] = self.boards_solved
-            file['results'] = self.neural_network_results
+        self.save_neural_network()
 
     def show_solution(self):
         global SHOW_CONFIDENCE
@@ -146,6 +168,17 @@ class MyGUI:
                         # Seek for damaged ships
                         ships = []
                         for i_shift, j_shift in SHIFTS:
+                            shifted_i = i + i_shift
+                            shifted_j = j + j_shift
+                            if not tile_exists(shifted_i, shifted_j):
+                                ships.append(0.01)
+                            else:
+                                if self.battlefield.cells[shifted_i][shifted_j]['bg'] == HIT_COLOUR:
+                                    ships.append(0.99)
+                                else:
+                                    ships.append(0.01)
+
+                        for i_shift, j_shift in SHIFTS2:
                             shifted_i = i + i_shift
                             shifted_j = j + j_shift
                             if not tile_exists(shifted_i, shifted_j):

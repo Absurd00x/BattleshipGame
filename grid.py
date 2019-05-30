@@ -1,6 +1,8 @@
 import tkinter as tk
-from random import randint
+from random import randint, seed
 from constants import *
+
+seed(31012000)
 
 #
 # Ship

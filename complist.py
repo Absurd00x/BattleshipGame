@@ -2,9 +2,8 @@ class CompressedList(list):
     def __init__(self, max_size=100):
         """
         Contains means of added values as their number exceed 'power'.
-        Means are stored in 'stored' variable.
         Last added values are stored in 'buff'
-        'stored' is resized when it's length exceeds 'max_size'
+        It is resized every time its size exeedc 'max_size'
         """
         super(CompressedList, self).__init__()
         self.buff = []

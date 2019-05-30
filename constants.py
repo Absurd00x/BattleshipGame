@@ -60,7 +60,7 @@ MISS_COLOUR = 'Cyan'
 # Neural network parameters
 #
 
-INPUT_NODES = 14
+INPUT_NODES = 30
 HIDDEN_NODES = 200
 OUTPUT_NODES = 1
 LEARNING_RATE = 0.00001
@@ -68,19 +68,21 @@ LEARNING_RATE = 0.00001
 # Number of ways to place the biggest in each cell
 # These values are intentionally put in segment [0, 1]
 HEURISTIC_CENTER = [[(min(i + 1, X_TILES - i, SHIP_TYPES) +
-                     min(j + 1, Y_TILES - j, SHIP_TYPES)) /
-                     (10 ** len(str(SHIP_TYPES * 2)))
+                     min(j + 1, Y_TILES - j, SHIP_TYPES))
                      for j in range(Y_TILES)] for i in range(X_TILES)]
 
 # This heuristic should teach NN to shoot in chess-like order. Like this:
 # x.x.x.x.x.x
 # .x.x.x.x.x.
 # x.x.x.x.x.x
-HEURISTIC_CHESS = [[0.99 if (i + j) % 2 == 0 else 0.01 for j in range(Y_TILES)] for i in range(X_TILES)]
+HEURISTIC_CHESS = [[1 if (i + j) % 2 == 0 else 0 for j in range(Y_TILES)] for i in range(X_TILES)]
 
+GAMES_TO_AUTOSAVE = 100
+MAXIMUM_GAMES = 100000
 CONFIDENCE_DELAY = 0.5
 TRAINING = False
 SHOW_CONFIDENCE = False
 FILE_NAME = 'data.txt'
 
 SHIFTS = ((-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1))
+
