@@ -6,12 +6,16 @@ class CompressedList(list):
         It is resized every time its size exeedc 'max_size'
         """
         super(CompressedList, self).__init__()
-        self.buff = []
+        self.buff = {}
         self.power = 1
         self.max_size = max_size
 
     def append(self, new):
-        self.buff.append(new)
+        if new in self.buff:
+            self.buff[new] += 1
+        else:
+            self.buff[new] = 1
+
         if len(self.buff) == self.power:
             super(CompressedList, self).append((sum(self.buff) / self.power))
             self.buff.clear()

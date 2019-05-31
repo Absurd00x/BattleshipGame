@@ -1,17 +1,29 @@
-import neuralnetwork
 import tkinter as tk
 import shelve
 from complist import CompressedList
+from copy import deepcopy
 from constants import *
 from grid import Grid, tile_exists
 from matplotlib import pyplot as plt
-from os import rename
 from time import sleep
 
 
-def stop_training():
-    global TRAINING
-    TRAINING = False
+def stop_solving():
+    global SOLVING
+    SOLVING = False
+
+
+def show_solution():
+    global SOLUTION
+    SOLUTION = False if SOLUTION else True
+
+
+class Statistics:
+    def __init__(self):
+        self.results = CompressedList()
+        self.best = X_TILES * Y_TILES
+        self.worst = 0
+        self.boards_solved = 0
 
 
 class MyGUI:
@@ -20,41 +32,68 @@ class MyGUI:
         self.root_geometry(WIDTH, HEIGHT)
         self.root.title('Battleship game')
 
-        self.frame = tk.Frame(master=self.root, width=FRAME_WIDTH, height=FRAME_HEIGHT)
-        self.battlefield = Grid(self.frame)
+        self.grid_frame = tk.Frame(master=self.root, width=GRID_WIDTH, height=GRID_HEIGHT)
+        self.battlefield = Grid(self.grid_frame)
 
-        self.frame.place(relx=NORMAL_FRAME_X_INDENT, rely=NORMAL_FRAME_Y_INDENT, anchor='center')
+        self.grid_frame.place(relx=NORMAL_FRAME_X_INDENT, rely=NORMAL_FRAME_Y_INDENT, anchor='center')
 
-        with shelve.open('data.txt') as file:
-            self.neural_network = file['nn']
-            self.boards_solved = file['solved']
-            # Number of misses in games
-            self.neural_network_results = file['results']
+        self.buttons_frame = tk.Frame(master=self.root, width=BUTTON_FRAME_WIDTH, height=BUTTON_FRAME_HEIGHT)
 
-        self.solved_label = tk.Label(text='Boards solved: {}'.format(self.boards_solved))
-        self.UI_buttons = {'stop': tk.Button(text='Stop\ntraining', command=stop_training),
+        with shelve.open(FILE_NAME) as file:
+            if 'stats' in file:
+                self.stats = file['stats']
+            else:
+                self.stats = Statistics()
+                file['stats'] = self.stats
+
+        self.UI_buttons = {'dummy': tk.Button(text='Dummy'),
                            'refresh': tk.Button(text='Refresh\nboard', command=self.battlefield.refresh),
-                           'hide': tk.Button(text='Show\nfleet', command=self.battlefield.show_player),
-                           'confidence': tk.Button(text='Show\nsolution', command=self.show_solution),
-                           'recreate': tk.Button(text='Recreate\nNN', command=self.create_new_neural_network),
-                           'train': tk.Button(text='Train\nNN', command=self.train_neural_network),
-                           'solve': tk.Button(text='Solve\nboard', command=self.solve_with_neural_network),
-                           'results': tk.Button(text='Show\nresults', command=self.show_results),
-                           'show': tk.Button(text='System\nbutton', command=self.system_command),
-                           'exit': tk.Button(text='Exit', command=self.root.destroy)}
+                           'hide': tk.Button(text='Show/hide\nfleet', command=self.battlefield.show_player),
+                           'solution': tk.Button(text='Show\nsolution', command=show_solution),
+                           'recreate': tk.Button(text='Dummy'),
+                           'stop': tk.Button(text='Stop\nsolving', command=stop_solving),
+                           'solve': tk.Button(text='Solve', command=self.solve),
+                           'results': tk.Button(text='Refresh\nresults', command=self.refresh_results),
+                           'plot': tk.Button(text='Results\nplot', command=self.show_results),
+                           'exit': tk.Button(text='Exit', command=self.finish)}
 
         self.buttons_matrix = [list(self.UI_buttons.values())[i:i + BUTTONS_PER_COLUMN]
                                for i in range(0, len(self.UI_buttons), BUTTONS_PER_COLUMN)]
 
         self.config_buttons(BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_BORDER, BUTTON_COLOUR)
 
-        self.place_buttons(X_INDENT, Y_INDENT)
+        self.place_buttons()
 
-        self.solved_label.place(relx=0.6, rely=0.9)
+        self.solved_label = tk.Label(text='Solved: {}'.format(self.stats.boards_solved))
+        self.solved_label.place(relx=0.71, rely=0.9)
 
-    def system_command(self):
-        with shelve.open('./NN cemetery/config') as config:
-            config['solved'] = 4
+        self.best_label = tk.Label(text='Best: {}'.format(self.stats.best))
+        self.best_label.place(relx=0.41, rely=0.9)
+
+        self.worst_label = tk.Label(text='Worst: {}'.format(self.stats.worst))
+        self.worst_label.place(relx=0.56, rely=0.9)
+
+    def save_results(self):
+        with shelve.open(FILE_NAME) as file:
+            file['stats'] = self.stats
+
+    def refresh_results(self):
+        self.solved_label['text'] = 'Solved: 0'
+        self.best_label['text'] = 'Best: 100'
+        self.worst_label['text'] = 'Worst: 0'
+        self.stats = Statistics()
+        self.save_results()
+
+    def finish(self):
+        self.save_results()
+        for button in self.UI_buttons.values():
+            button.destroy()
+        for cell_row in self.battlefield.cells:
+            for cell in cell_row:
+                cell.destroy()
+        self.grid_frame.destroy()
+        self.buttons_frame.destroy()
+        self.root.destroy()
 
     def root_geometry(self, width, height):
         screen_width = self.root.winfo_screenwidth()
@@ -63,20 +102,18 @@ class MyGUI:
         y = int((screen_height / 2) - (height / 2))
         self.root.geometry('{:d}x{:d}+{:d}+{:d}'.format(width, height, x, y))
 
-    def place_buttons(self, x_indent, y_indent):
-        for column_index in range(len(self.buttons_matrix)):
-            for row_index in range(len(self.buttons_matrix[column_index])):
-                self.buttons_matrix[column_index][row_index].place(relx=(0.02 + x_indent * column_index),
-                                                                   rely=(0.03 + y_indent * row_index))
+    def place_buttons(self):
+        for x, button_row in enumerate(self.buttons_matrix):
+            for y, button in enumerate(button_row):
+                button.grid(row=y, column=x)
 
     def config_buttons(self, width, height, border, colour):
         for UI_button in self.UI_buttons.values():
             UI_button.config(width=width, height=height, bd=border, bg=colour)
 
     def draw_plot(self):
-        results = self.neural_network_results
-        games_played = [int(n * results.power) for n in range(1, len(results) + 1)]
-        plt.plot(games_played, results)
+        games_played = [int(n * self.stats.results.power) for n in range(1, len(self.stats.results) + 1)]
+        plt.plot(games_played, self.stats.results)
         plt.title('Game history')
         plt.xlabel('Games played')
         plt.ylabel('Misses')
@@ -86,131 +123,148 @@ class MyGUI:
         plt.show()
 
     #
-    # NN logic
+    # Solution logic
     #
 
-    def save_neural_network(self):
-        with shelve.open(FILE_NAME) as file:
-            file['nn'] = self.neural_network
-            file['solved'] = self.boards_solved
-            file['results'] = self.neural_network_results
-
-    def create_new_neural_network(self):
-        self.save_neural_network()
-        if self.boards_solved >= 10000:
-            with shelve.open('./NN cemetery/config') as config:
-                nn_count = config['count']
-                self.draw_plot()
-                plt.savefig('./NN cemetery/{}_{}.png'.format(nn_count, self.boards_solved), format='png', dpi=100)
-                plt.clf()
-                rename('./{}'.format(FILE_NAME), './NN cemetery/{}_{}'.format(nn_count, self.neural_network_results[-1]))
-                config['count'] += 1
-        with shelve.open(FILE_NAME) as file:
-            nn = neuralnetwork.NeuralNetwork(INPUT_NODES, HIDDEN_NODES, OUTPUT_NODES, LEARNING_RATE)
-            file['nn'] = nn
-            file['solved'] = 0
-            file['results'] = CompressedList()
-            self.neural_network = nn
-            self.boards_solved = 0
-            self.neural_network_results = CompressedList()
-            self.solved_label['text'] = 'Boards solved: 0'
-
-    def train_neural_network(self):
-        global TRAINING
-        TRAINING = True
-        games_until_autosave = 0
-        while TRAINING:
-            if self.boards_solved >= MAXIMUM_GAMES:
-                TRAINING = False
-                break
-            if games_until_autosave >= GAMES_TO_AUTOSAVE:
-                self.save_neural_network()
-                games_until_autosave = 0
-            self.solve_with_neural_network()
+    def solve(self):
+        global SOLVING
+        SOLVING = True
+        solved_after_autosave = 0
+        while SOLVING:
+            self.solve_one()
             self.battlefield.refresh()
-            games_until_autosave += 1
             self.root.update()
+            solved_after_autosave += 1
+            if solved_after_autosave >= GAMES_TO_AUTOSAVE:
+                self.save_results()
 
-        self.save_neural_network()
+    def get_biggest_ship_size(self):
+        for size, type_destroyed in zip(range(len(self.battlefield.player.destroyed), 0, -1),
+                                        self.battlefield.player.destroyed[::-1]):
+            if type_destroyed < 1:  # 'type_destroyed' is a float
+                return size
 
-    def show_solution(self):
-        global SHOW_CONFIDENCE
-        if SHOW_CONFIDENCE:
-            SHOW_CONFIDENCE = False
-            self.battlefield.stretched = False
-            self.root_geometry(WIDTH, HEIGHT)
-            self.place_buttons(X_INDENT, Y_INDENT)
-            self.battlefield.frame.place(relx=NORMAL_FRAME_X_INDENT, rely=NORMAL_FRAME_Y_INDENT, anchor='center')
-            self.battlefield.resize_cells(CELL_WIDTH, CELL_HEIGHT)
-        else:
-            SHOW_CONFIDENCE = True
-            self.battlefield.stretched = True
-            self.root_geometry(STRETCHED_WIDTH, STRETCHED_HEIGHT)
-            self.place_buttons(STRETCHED_X_INDENT, STRETCHED_Y_INDENT)
-            self.battlefield.frame.place(relx=STRETCHED_FRAME_X_INDENT, rely=STRETCHED_FRAME_Y_INDENT, anchor='center')
-            self.battlefield.resize_cells(STRETCHED_CELL_WIDTH, STRETCHED_CELL_HEIGHT)
+    def solve_one(self):
+        confidence_grid = deepcopy(HEURISTIC_SUMMARY)
+        current_order = 1
 
-    def solve_with_neural_network(self):
-        # Get NN from file
-        """
-        What I show to NN:
-        Revealed damaged ships around a cell
-        Heuristic
-        NN processes each cell separately
-        """
+        only_one_sized_ships_left = False
         while self.battlefield.player.parts_alive > 0:
-            nn_input = None
-            nn_answer = (None, None)
-            maximum_confidence = 0.0
+            switch_to_chess_order1 = 0
+            switch_to_chess_order2 = 0
+
+            # Detecting the biggest ship
+            biggest_ship_size = self.get_biggest_ship_size()
+
+            if biggest_ship_size == 1 and not only_one_sized_ships_left:
+                for i in range(X_TILES):
+                    for j in range(Y_TILES):
+                        if (confidence_grid[i][j] > 0 and
+                           self.battlefield.cells[i][j]['bg'] == DEFAULT_COLOUR):
+                            new_confidence = 1
+
+                            for i_shift, j_shift in SHIFTS_AROUND:
+                                i_shifted = i + i_shift
+                                j_shifted = j + j_shift
+                                if (tile_exists(i_shifted, j_shifted) and
+                                   self.battlefield.cells[i_shifted][j_shifted]['bg'] == DEFAULT_COLOUR):
+                                    new_confidence += 1
+
+                            confidence_grid[i][j] = new_confidence
+            else:
+                for i in range(X_TILES):
+                    for j in range(Y_TILES):
+                        if self.battlefield.cells[i][j]['bg'] != DEFAULT_COLOUR:
+                            if (i + j + 1) % 2 == 0:
+                                switch_to_chess_order1 += 1
+                            else:
+                                switch_to_chess_order2 += 1
+
+                if current_order == 2 and switch_to_chess_order1 > switch_to_chess_order2:
+                    confidence_grid += HEURISTIC_CHESS1 - HEURISTIC_CHESS2
+                    current_order = 1
+
+                elif current_order == 1 and switch_to_chess_order2 > switch_to_chess_order1:
+                    confidence_grid += HEURISTIC_CHESS2 - HEURISTIC_CHESS1
+                    current_order = 2
+
+            maximum_confidence = 0
+            answer = (None, None)
             for i in range(X_TILES):
                 for j in range(Y_TILES):
-                    if self.battlefield.cells[i][j]['bg'] == 'Grey':
-                        # Seek for damaged ships
-                        ships = []
-                        for i_shift, j_shift in SHIFTS:
-                            shifted_i = i + i_shift
-                            shifted_j = j + j_shift
-                            if not tile_exists(shifted_i, shifted_j):
-                                ships.append(0.01)
-                            else:
-                                if self.battlefield.cells[shifted_i][shifted_j]['bg'] == HIT_COLOUR:
-                                    ships.append(0.99)
-                                else:
-                                    ships.append(0.01)
+                    if self.battlefield.cells[i][j]['bg'] == DEFAULT_COLOUR:
+                        if confidence_grid[i][j] > maximum_confidence:
+                            answer = (i, j)
+                            maximum_confidence = confidence_grid[i][j]
+            x, y = answer
 
-                        for i_shift, j_shift in SHIFTS2:
-                            shifted_i = i + i_shift
-                            shifted_j = j + j_shift
-                            if not tile_exists(shifted_i, shifted_j):
-                                ships.append(0.01)
-                            else:
-                                if self.battlefield.cells[shifted_i][shifted_j]['bg'] == HIT_COLOUR:
-                                    ships.append(0.99)
-                                else:
-                                    ships.append(0.01)
+            # Computing if it should continue shooting in that direction
+            # e.g. you should not continue shooting 4 or more tiles in a row
+            # if you have already sank a 4-sized ship
+            for x_shift, y_shift in SHIFTS_HORIZONTAL_VERTICAL:
+                x_shifted = x + x_shift
+                y_shifted = y + y_shift
 
-                        nn_input = (ships + [HEURISTIC_CENTER[i][j], HEURISTIC_CHESS[i][j]]
-                                    + self.battlefield.player.destroyed)
-                        confidence = float(self.neural_network.query(nn_input))
-                        if confidence > maximum_confidence:
-                            nn_answer = (i, j)
-                            maximum_confidence = confidence
-                        self.battlefield.cells[i][j]['bg'] = 'Grey'
-                        if SHOW_CONFIDENCE:
-                            self.battlefield.cells[i][j]['text'] = '{:.2f}%'.format(maximum_confidence * 100)
-            self.battlefield.click_logic(nn_answer[0], nn_answer[1])
-            if SHOW_CONFIDENCE:
+                if (tile_exists(x_shifted, y_shifted) and
+                        self.battlefield.cells[x_shifted][y_shifted]['bg'] == HIT_COLOUR):
+                    parts_hit = 0
+
+                    # Counting parts hit leading to this cell
+                    for times in range(1, 5):
+                        x_shifted = x + x_shift * times
+                        y_shifted = y + y_shift * times
+                        if tile_exists(x_shifted, y_shifted):
+                            if self.battlefield.cells[x_shifted][y_shifted]['bg'] != HIT_COLOUR:
+                                break
+                            else:
+                                parts_hit += 1
+
+                    # Detecting the biggest ship
+                    biggest_ship_size = self.get_biggest_ship_size()
+
+                    if parts_hit == SHIP_TYPES or parts_hit >= biggest_ship_size:
+                        confidence_grid[x][y] -= X_TILES * Y_TILES * 100
+
+            if confidence_grid[x][y] > 0:
+                self.battlefield.click_logic(x, y)
+
+            if self.battlefield.cells[x][y]['bg'] == HIT_COLOUR:
+                # Ship can't be placed diagonally
+                for x_shift, y_shift in SHIFTS_DIAGONAL:
+                    x_shifted = x + x_shift
+                    y_shifted = y + y_shift
+
+                    if tile_exists(x_shifted, y_shifted):
+                        confidence_grid[x_shifted][y_shifted] -= X_TILES * Y_TILES * 100
+
+                # Ship can be placed horizontally or vertically
+                for x_shift, y_shift in SHIFTS_HORIZONTAL_VERTICAL:
+                    x_shifted = x + x_shift
+                    y_shifted = y + y_shift
+
+                    if tile_exists(x_shifted, y_shifted):
+                        confidence_grid[x_shifted][y_shifted] += SHIP_TYPES * 4
+
+            if SOLUTION:
                 self.root.update()
-                sleep(CONFIDENCE_DELAY)
-            correct_answer = [1] if self.battlefield.cells[nn_answer[0]][nn_answer[1]]['bg'] == HIT_COLOUR else [0]
-            self.neural_network.train(nn_input, correct_answer)
+                sleep(SOLUTION_DELAY)
 
+        # Calculating amount of misses
         result = sum([sum([1 if cell['bg'] == MISS_COLOUR else 0
                       for cell in cell_row])
                       for cell_row in self.battlefield.cells])
-        self.neural_network_results.append(result)
-        self.boards_solved += 1
-        self.solved_label['text'] = 'Boards solved: {}'.format(self.boards_solved)
+
+        self.stats.results.append(result)
+        self.stats.boards_solved += 1
+
+        if result < self.stats.best:
+            self.stats.best = result
+            self.best_label['text'] = 'Best: {}'.format(result)
+        if result > self.stats.worst:
+            self.stats.worst = result
+            self.worst_label['text'] = 'Worst: {}'.format(result)
+
+        self.solved_label['text'] = 'Solved: {}'.format(self.stats.boards_solved)
 
 
 gui = MyGUI()
