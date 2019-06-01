@@ -8,20 +8,13 @@ from constants import *
 
 
 class Ship:
-    def __init__(self, x, y, size, rotation):
-        self.x = x
-        self.y = y
+    def __init__(self, size):
         self.size = size
-        self.rotation = rotation
         self.health = size
 
 #
 # Fleet
 #
-
-
-def tile_exists(x, y):
-    return -1 < x < X_TILES and -1 < y < Y_TILES
 
 
 class FitError(Exception):
@@ -35,7 +28,7 @@ class FitError(Exception):
 class Fleet:
     def __init__(self):
         self.ships = []
-        self.colour = PLAYER_COLOUR
+        self.colour = SHIP_COLOUR
         # Displays ship size placed in a tile
         self.taken = [[0 for _ in range(Y_TILES)] for _ in range(X_TILES)]
         self.destroyed = [0 for _ in range(SHIP_TYPES)]
@@ -65,7 +58,6 @@ class Fleet:
             if current_try == tries:
                 raise FitError
             replace = False
-            x_pos, y_pos = None, None
             rotation = HORIZONTAL if randint(0, 1) else VERTICAL
             if rotation is HORIZONTAL:
                 x_pos = randint(0, X_TILES - 1)
@@ -98,7 +90,7 @@ class Fleet:
             current_try += 1
 
             if not replace:
-                self.ships.append(Ship(x_pos, y_pos, size, rotation))
+                self.ships.append(Ship(size))
                 self.ship_number += 1
                 placed += 1
                 current_try = 0
@@ -109,31 +101,91 @@ class Fleet:
 
 
 class Grid:
-    def __init__(self, frame, stretched=False):
+    def __init__(self, frame):
         self.frame = frame
-        self.stretched = stretched
-        self.cells = None
-        if stretched:
-            self.fit_cells(STRETCHED_CELL_WIDTH, STRETCHED_CELL_HEIGHT)
-        else:
-            self.fit_cells(CELL_WIDTH, CELL_HEIGHT)
+
+        self.cells = [[tk.Button(master=self.frame, bg=DEFAULT_COLOUR, bd=1)
+                       for _ in range(Y_TILES)] for _ in range(X_TILES)]
 
         self.player = Fleet()
 
-    def fit_cells(self, width, height):
-        self.cells = [[tk.Button(master=self.frame, bg=DEFAULT_COLOUR, bd=1, width=width, height=height)
-                       for _ in range(Y_TILES)] for _ in range(X_TILES)]
+        self.current_logic = 'preparation'
+        self.flip_click_logic()
+        self.place_cells()
 
-        for x in range(X_TILES):
-            for y in range(Y_TILES):
-                self.cells[x][y].config(command=lambda i=x, j=y: self.click_logic(i, j))
-                self.cells[x][y].grid(row=x, column=y)
+    def bfs(self, i, j, visited):
+        visited[i][j] = True
+        queue = [(i, j)]
+        cur_x, cur_y, size = None, None, 0
+        while len(queue) > 0:
+            size += 1
+            cur_x, cur_y = queue.pop()
+            for x_shifted, y_shifted in apply_shift(cur_x, cur_y, SHIFTS_HORIZONTAL_VERTICAL):
+                if self.player.taken[x_shifted][y_shifted] and not visited[x_shifted][y_shifted]:
+                    visited[x_shifted][y_shifted] = True
+                    queue.append((x_shifted, y_shifted))
 
-    def resize_cells(self, width, height):
-        for x in range(X_TILES):
-            for y in range(Y_TILES):
-                self.cells[x][y].config(width=width, height=height)
-                self.cells[x][y].grid(row=x, column=y)
+        return size
+
+    def check_ships(self):
+        for i in range(X_TILES):
+            for j in range(Y_TILES):
+                if self.player.taken[i][j]:
+                    for i_shifted, j_shifted in apply_shift(i, j, SHIFTS_DIAGONAL):
+                        if self.player.taken[i_shifted][j_shifted]:
+                            return False
+
+                    connection_count = 0
+
+                    for i_shifted, j_shifted in apply_shift(i, j, SHIFTS_HORIZONTAL_VERTICAL):
+                        if self.player.taken[i_shifted][j_shifted]:
+                            connection_count += 1
+
+                    if connection_count > 2:
+                        return False
+                    elif connection_count == 2:
+                        # Checking if 2 "connected" tiles lie on a straight line
+                        if not ((tile_exists(i + 1, j) and tile_exists(i - 1, j) and
+                                self.player.taken[i + 1][j] and self.player.taken[i - 1][j]) or
+                                (tile_exists(i, j + 1) and tile_exists(i, j - 1) and
+                                self.player.taken[i][j + 1] and self.player.taken[i][j - 1])):
+                            return False
+
+        visited = [[False for _ in range(Y_TILES)] for _ in range(X_TILES)]
+        sizes = {}
+        for i in range(X_TILES):
+            for j in range(Y_TILES):
+                if self.player.taken[i][j] and not visited[i][j]:
+                    size = self.bfs(i, j, visited)
+                    if size in sizes:
+                        sizes[size] += 1
+                    else:
+                        sizes[size] = 1
+
+        correct_sizes = {1: False, 2: False, 3: False, 4: False}
+
+        for size in sizes.keys():
+            if size not in correct_sizes:
+                return False
+            else:
+                correct_sizes[size] = True
+
+        for present in correct_sizes.values():
+            if not present:
+                return False
+
+        return sizes[4] == 1 and sizes[3] == 2 and sizes[2] == 3 and sizes[1] == 4
+
+    def lock(self):
+        for cell_row in self.cells:
+            for cell in cell_row:
+                cell['state'] = 'disabled'
+
+    def unlock(self):
+        for cell_row in self.cells:
+            for cell in cell_row:
+                if cell['bg'] == DEFAULT_COLOUR:
+                    cell['state'] = 'normal'
 
     def show_player(self):
         if self.player.shown:
@@ -144,26 +196,41 @@ class Grid:
             self.player.shown = True
 
     def hide(self):
-        for ship in self.player.ships:
-            if ship.rotation is HORIZONTAL:
-                for y_pos in range(ship.y, ship.y + ship.size):
-                    if self.cells[ship.x][y_pos]['bg'] != HIT_COLOUR:
-                        self.cells[ship.x][y_pos]['bg'] = DEFAULT_COLOUR
-            elif ship.rotation is VERTICAL:
-                for x_pos in range(ship.x, ship.x + ship.size):
-                    if self.cells[x_pos][ship.y]['bg'] != HIT_COLOUR:
-                        self.cells[x_pos][ship.y]['bg'] = DEFAULT_COLOUR
+        for i in range(X_TILES):
+            for j in range(Y_TILES):
+                if self.player.taken[i][j] and self.cells[i][j]['bg'] != HIT_COLOUR:
+                    self.cells[i][j]['bg'] = DEFAULT_COLOUR
 
     def reveal(self):
-        for ship in self.player.ships:
-            if ship.rotation is HORIZONTAL:
-                for y_pos in range(ship.y, ship.y + ship.size):
-                    if self.cells[ship.x][y_pos]['bg'] == DEFAULT_COLOUR:
-                        self.cells[ship.x][y_pos]['bg'] = PLAYER_COLOUR
-            elif ship.rotation is VERTICAL:
-                for x_pos in range(ship.x, ship.x + ship.size):
-                    if self.cells[x_pos][ship.y]['bg'] == DEFAULT_COLOUR:
-                        self.cells[x_pos][ship.y]['bg'] = PLAYER_COLOUR
+        for i in range(X_TILES):
+            for j in range(Y_TILES):
+                if self.player.taken[i][j] and self.cells[i][j]['bg'] != HIT_COLOUR:
+                    self.cells[i][j]['bg'] = SHIP_COLOUR
+
+    def place_cells(self):
+        for x in range(X_TILES):
+            for y in range(Y_TILES):
+                self.cells[x][y].grid(row=x, column=y)
+
+    def flip_click_logic(self):
+        if self.current_logic == 'default':
+            self.current_logic = 'preparation'
+            for x in range(X_TILES):
+                for y in range(Y_TILES):
+                    self.cells[x][y]['command'] = lambda i=x, j=y: self.prepare_click_logic(i, j)
+        else:
+            self.current_logic = 'default'
+            for x in range(X_TILES):
+                for y in range(Y_TILES):
+                    self.cells[x][y]['command'] = lambda i=x, j=y: self.click_logic(i, j)
+
+    def prepare_click_logic(self, i, j):
+        if self.cells[i][j]['bg'] == SHIP_COLOUR:
+            self.cells[i][j]['bg'] = DEFAULT_COLOUR
+            self.player.taken[i][j] = 0
+        else:
+            self.cells[i][j]['bg'] = SHIP_COLOUR
+            self.player.taken[i][j] = 1
 
     def click_logic(self, i, j):
         if self.player.taken[i][j]:
@@ -178,10 +245,11 @@ class Grid:
         else:
             self.cells[i][j]['bg'] = MISS_COLOUR
         self.cells[i][j]['state'] = 'disabled'
+        self.cells[i][j].update()
 
     def refresh(self):
         # Stupid tkinter objects need to be destroyed manually
         for cell_row in self.cells:
             for cell in cell_row:
                 cell.destroy()
-        self.__init__(self.frame, self.stretched)
+        self.__init__(self.frame)
