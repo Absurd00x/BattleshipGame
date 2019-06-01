@@ -3,7 +3,7 @@ from random import randint
 from constants import *
 
 #
-# Ship
+# Корабль
 #
 
 
@@ -13,7 +13,7 @@ class Ship:
         self.health = size
 
 #
-# Fleet
+# Флот
 #
 
 
@@ -29,7 +29,7 @@ class Fleet:
     def __init__(self):
         self.ships = []
         self.colour = SHIP_COLOUR
-        # Displays ship size placed in a tile
+        # Отображает номер корабля, помещенного на определенное поле
         self.taken = [[0 for _ in range(Y_TILES)] for _ in range(X_TILES)]
         self.destroyed = [0 for _ in range(SHIP_TYPES)]
         self.ship_number = 1
@@ -63,7 +63,7 @@ class Fleet:
                 x_pos = randint(0, X_TILES - 1)
                 y_pos = randint(0, Y_TILES - size)
 
-                # Checking if ships overlap
+                # Проверяю - не пересекаются ли корабли
                 for y in range(y_pos, y_pos + size):
                     replace = (self.check_tiles_around(x_pos, y)
                                or self.taken[x_pos][y])
@@ -77,7 +77,7 @@ class Fleet:
                 x_pos = randint(0, X_TILES - size)
                 y_pos = randint(0, Y_TILES - 1)
 
-                # Проверка
+                # Аналогичная проверка
                 for x in range(x_pos, x_pos + size):
                     replace = (self.check_tiles_around(x, y_pos)
                                or self.taken[x][y_pos])
@@ -96,7 +96,7 @@ class Fleet:
                 current_try = 0
 
 #
-# Grid
+# Игровое поле
 #
 
 
@@ -144,7 +144,7 @@ class Grid:
                     if connection_count > 2:
                         return False
                     elif connection_count == 2:
-                        # Checking if 2 "connected" tiles lie on a straight line
+                        # Проверяю - располагаются ли 2е "соедененные" клетки на одной линии
                         if not ((tile_exists(i + 1, j) and tile_exists(i - 1, j) and
                                 self.player.taken[i + 1][j] and self.player.taken[i - 1][j]) or
                                 (tile_exists(i, j + 1) and tile_exists(i, j - 1) and
@@ -248,7 +248,7 @@ class Grid:
         self.cells[i][j].update()
 
     def refresh(self):
-        # Stupid tkinter objects need to be destroyed manually
+        # Тупые объекты tkinter'а нужно уничтожать вручную
         for cell_row in self.cells:
             for cell in cell_row:
                 cell.destroy()

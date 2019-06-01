@@ -15,7 +15,7 @@ class MyGUI:
     def __init__(self):
         self.root = tk.Tk()
         self.root_geometry(WIDTH, HEIGHT)
-        self.root.title('Battleship game')
+        self.root.title('Морской бой')
         self.root.resizable(width=False, height=False)
 
         self.player_frame = tk.Frame(master=self.root)
@@ -32,11 +32,11 @@ class MyGUI:
 
         self.button_frame = tk.Frame(master=self.root)
 
-        self.UI_buttons = {'new game': tk.Button(self.button_frame, text='New\ngame', command=self.new_game),
-                           'place': tk.Button(self.button_frame, text='Place\nrandomly',
+        self.UI_buttons = {'new game': tk.Button(self.button_frame, text='Новая\nигра', command=self.new_game),
+                           'place': tk.Button(self.button_frame, text='Расставить\nслучайно',
                                               command=self.place_ships),
-                           'play': tk.Button(self.button_frame, text='Play!', command=self.play),
-                           'exit': tk.Button(self.button_frame, text='Exit', command=self.finish)}
+                           'play': tk.Button(self.button_frame, text='Начать!', command=self.play),
+                           'exit': tk.Button(self.button_frame, text='Выход', command=self.finish)}
 
         self.buttons_matrix = [list(self.UI_buttons.values())[i:i + BUTTONS_PER_COLUMN]
                                for i in range(0, len(self.UI_buttons), BUTTONS_PER_COLUMN)]
@@ -46,14 +46,14 @@ class MyGUI:
         self.place_buttons()
         self.button_frame.place(relx=BUTTON_FRAME_X, rely=BUTTON_FRAME_Y)
 
-        self.player_label = tk.Label(self.root, text='Your field')
+        self.player_label = tk.Label(self.root, text='Ваше поле')
         self.player_label.place(relx=PLAYER_LABEL_X, rely=BELONG_LABEL_Y)
 
-        self.bot_label = tk.Label(self.root, text='Computers field')
+        self.bot_label = tk.Label(self.root, text='Поле компьютера')
         self.bot_label.place(relx=BOT_LABEL_X, rely=BELONG_LABEL_Y)
         self.bot_turn = self.bot_init()
 
-        self.statistics_label = tk.Label(self.root, text='Statistics')
+        self.statistics_label = tk.Label(self.root, text='Статистика')
         self.statistics_label.place(relx=STATISTICS_LABEL_X, rely=STATISTICS_LABEL_Y)
 
         self.stats = Statistics()
@@ -68,18 +68,18 @@ class MyGUI:
             self.stats.player_score = 0
             self.stats.bot_score = 0
 
-        self.player_score_label = tk.Label(self.root, text='Player score: {}'.format(self.stats.player_score))
+        self.player_score_label = tk.Label(self.root, text='Счёт игрока: {}'.format(self.stats.player_score))
         self.player_score_label.place(relx=SCORE_LABEL_X, rely=PLAYER_SCORE_LABEL_Y)
 
-        self.bot_score_label = tk.Label(self.root, text='Bot score: {}'.format(self.stats.bot_score))
+        self.bot_score_label = tk.Label(self.root, text='Счёт компьютера: {}'.format(self.stats.bot_score))
         self.bot_score_label.place(relx=SCORE_LABEL_X, rely=BOT_SCORE_LABEL_Y)
 
-        self.winrate_label = tk.Label(self.root, text='Winrate: {}%'.format(
+        self.winrate_label = tk.Label(self.root, text='Процент побед: {}%'.format(
             int((self.stats.player_score / max(1, (self.stats.player_score + self.stats.bot_score))) * 100)))
         self.winrate_label.place(relx=SCORE_LABEL_X, rely=WINRATE_LABEL_Y)
 
         self.info_label = tk.Label(self.root,
-                                   text='Bot was solving randomly\ngenerated boards\nmissing 43 times on average')
+                                 text='Компьютер решал случайно\nсгенерированные доски\nпромахиваясь в среднем 43 раза')
         self.info_label.place(relx=SCORE_LABEL_X, rely=INFO_LABEL_Y)
 
         self.over = False
@@ -87,7 +87,7 @@ class MyGUI:
     def play(self):
         if not self.over:
             if not self.player_field.check_ships():
-                messagebox.showerror("Error", "Ships placed inappropriately")
+                messagebox.showerror("Ошибка", "Корабли расставлены неправильно")
             else:
                 self.player_field.flip_click_logic()
                 self.bot_field.unlock()
@@ -97,7 +97,7 @@ class MyGUI:
                         self.bot_field.cells[x][y]['command'] = lambda i=x, j=y: self.player_click_logic(i, j)
                 turn = 'player' if randint(0, 1) else 'bot'
                 if turn == 'player':
-                    messagebox.showinfo("It's your turn", "You go first!")
+                    messagebox.showinfo("Ваш ход", "Вы ходите первым!")
                 if turn == 'bot':
                     self.bot_turn()
 
@@ -115,9 +115,9 @@ class MyGUI:
             self.bot_turn = self.bot_init()
 
     def refresh_stats(self):
-        self.player_score_label['text'] = 'Player score: {}'.format(self.stats.player_score)
-        self.bot_score_label['text'] = 'Bot score: {}'.format(self.stats.bot_score)
-        self.winrate_label['text'] = 'Winrate: {}%'.format(
+        self.player_score_label['text'] = 'Счёт игрока: {}'.format(self.stats.player_score)
+        self.bot_score_label['text'] = 'Счёт компьютера: {}'.format(self.stats.bot_score)
+        self.winrate_label['text'] = 'Процент побед: {}%'.format(
             int((self.stats.player_score / max(1, (self.stats.player_score + self.stats.bot_score))) * 100))
 
     def game_over(self, winner):
@@ -126,11 +126,11 @@ class MyGUI:
 
         if winner == 'player':
             self.stats.player_score += 1
-            messagebox.showinfo("Congratulations!", "You have beaten the computer!")
+            messagebox.showinfo("Поздравляю!", "Вы победили компьютер!")
         else:
             self.stats.bot_score += 1
             self.bot_field.show_player()
-            answer = 'yes' if messagebox.askyesno("Defeat", "You have been defeated\nRematch?") else 'no'
+            answer = 'yes' if messagebox.askyesno("Поражение", "Вы потерпели поражение\nСыграть снова?") else 'no'
             if answer == 'yes':
                 self.new_game()
         self.refresh_stats()
@@ -173,13 +173,13 @@ class MyGUI:
         self.root.destroy()
 
     #
-    # Solution logic
+    # Логика решения
     #
 
     def get_biggest_ship_size(self):
         for size, type_destroyed in zip(range(len(self.player_field.player.destroyed), 0, -1),
                                         self.player_field.player.destroyed[::-1]):
-            if type_destroyed < 1:  # 'type_destroyed' is a float
+            if type_destroyed < 1:  # 'type_destroyed' это дробное число
                 return size
 
     def bot_init(self):
@@ -203,7 +203,7 @@ class MyGUI:
                 switch_to_chess_order1 = 0
                 switch_to_chess_order2 = 0
 
-                # Detecting the biggest ship
+                # Обнаруживаю самый большой корабль
                 biggest_ship_size = self.get_biggest_ship_size()
 
                 if biggest_ship_size == 1 and not only_one_sized_ships_left:
@@ -244,9 +244,9 @@ class MyGUI:
                                 maximum_confidence = confidence_grid[i][j]
                 x, y = answer
 
-                # Computing if it should continue shooting in that direction
-                # e.g. you should not continue shooting 4 or more tiles in a row
-                # if you have already sank a 4-sized ship
+                # Вычисляю - нужно ли продолжать стрелять в этом направлении
+                # Например, не нужно стрелить 4 или более раз в ряд,
+                # если уже потоплен 4х-палубный корабль
                 for x_shift, y_shift in SHIFTS_HORIZONTAL_VERTICAL:
                     x_shifted = x + x_shift
                     y_shifted = y + y_shift
@@ -255,7 +255,7 @@ class MyGUI:
                             self.player_field.cells[x_shifted][y_shifted]['bg'] == HIT_COLOUR):
                         parts_hit = 0
 
-                        # Counting parts hit leading to this cell
+                        # Вычисляю количество пораженных частей, которые идут к этому полю
                         for times in range(1, 5):
                             x_shifted = x + x_shift * times
                             y_shifted = y + y_shift * times
@@ -265,7 +265,7 @@ class MyGUI:
                                 else:
                                     parts_hit += 1
 
-                        # Detecting the biggest ship
+                        # Обнаруживаю самый большой корабль
                         biggest_ship_size = self.get_biggest_ship_size()
 
                         if parts_hit == SHIP_TYPES or parts_hit >= biggest_ship_size:
@@ -276,11 +276,11 @@ class MyGUI:
                     shot[x][y] = True
 
                     if self.player_field.cells[x][y]['bg'] == HIT_COLOUR:
-                        # Ship can't be placed diagonally
+                        # Корабли не могут находиться по диагонали
                         for x_shifted, y_shifted in apply_shift(x, y, SHIFTS_DIAGONAL):
                             confidence_grid[x_shifted][y_shifted] -= X_TILES * Y_TILES * 100
 
-                        # Ship can be placed horizontally or vertically
+                        # Корабли могут находиться горизонтально или вертикально
                         for x_shifted, y_shifted in apply_shift(x, y, SHIFTS_HORIZONTAL_VERTICAL):
                             confidence_grid[x_shifted][y_shifted] += SHIP_TYPES * 4
                 else:
