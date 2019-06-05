@@ -1,5 +1,3 @@
-from numpy import array as numpy_array
-
 #
 # Главное окно
 #
@@ -7,8 +5,8 @@ from numpy import array as numpy_array
 X_TILES = 10
 Y_TILES = 10
 
-WIDTH = 85 * X_TILES
-HEIGHT = 40 * Y_TILES
+WIDTH = 75 * X_TILES
+HEIGHT = 35 * Y_TILES
 
 STATISTICS_LABEL_X = 0.09
 STATISTICS_LABEL_Y = 0.05
@@ -36,7 +34,7 @@ BOT_LABEL_X = 0.7375
 #
 
 BUTTON_HEIGHT = 3
-BUTTON_WIDTH = 6
+BUTTON_WIDTH = 8
 
 BUTTON_FRAME_X = 0.025
 BUTTON_FRAME_Y = 0.45
@@ -71,8 +69,8 @@ HEURISTIC_CENTER = [[(min(i + 1, X_TILES - i, SHIP_TYPES) +
 # x.x.x.x.x.x
 # .x.x.x.x.x.
 # x.x.x.x.x.x
-HEURISTIC_CHESS1 = numpy_array([[((i + j) % 2) * SHIP_TYPES * 2 for j in range(Y_TILES)] for i in range(X_TILES)])
-HEURISTIC_CHESS2 = numpy_array([[((i + j + 1) % 2) * SHIP_TYPES * 2 for j in range(Y_TILES)] for i in range(X_TILES)])
+HEURISTIC_CHESS1 = [[((i + j) % 2) * SHIP_TYPES * 2 for j in range(Y_TILES)] for i in range(X_TILES)]
+HEURISTIC_CHESS2 = [[((i + j + 1) % 2) * SHIP_TYPES * 2 for j in range(Y_TILES)] for i in range(X_TILES)]
 
 #
 # Прочее

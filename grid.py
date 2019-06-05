@@ -25,6 +25,15 @@ class FitError(Exception):
         super().__init__('Could not fit all the ships into battlefield')
 
 
+class BFSError(Exception):
+    """
+    An exception in case 'change' parameter is set to 'True'
+    and 'new_size' parameter is set to None or 0
+    """
+    def __init__(self):
+        super().__init__('BFS function was given incorrect parameters')
+
+
 class Fleet:
     def __init__(self):
         self.ships = []
@@ -47,6 +56,32 @@ class Fleet:
                 if self.taken[x + x_shift][y + y_shift]:
                     return True
         return False
+
+    def bfs(self, i, j, visited, change=False, new_size=None):
+        """
+        Если 'change' установлен как 'True' то функция будет
+        приравнивать значения матрицы 'taken' к значению 'new_size'
+        Который должен отвечать за размер корабля в занятой ячейке
+        """
+        if change and ((new_size is None) or (new_size == 0)):
+            raise BFSError
+
+        visited[i][j] = True
+        queue = [(i, j)]
+        cur_x, cur_y, size = None, None, 0
+        while len(queue) > 0:
+            size += 1
+            cur_x, cur_y = queue.pop()
+
+            if change:
+                self.taken[cur_x][cur_y] = new_size
+
+            for x_shifted, y_shifted in apply_shift(cur_x, cur_y, SHIFTS_HORIZONTAL_VERTICAL):
+                if self.taken[x_shifted][y_shifted] and not visited[x_shifted][y_shifted]:
+                    visited[x_shifted][y_shifted] = True
+                    queue.append((x_shifted, y_shifted))
+
+        return size
 
     def place_ship(self, size, to_place):
 
@@ -95,68 +130,40 @@ class Fleet:
                 placed += 1
                 current_try = 0
 
-#
-# Игровое поле
-#
-
-
-class Grid:
-    def __init__(self, frame):
-        self.frame = frame
-
-        self.cells = [[tk.Button(master=self.frame, bg=DEFAULT_COLOUR, bd=1)
-                       for _ in range(Y_TILES)] for _ in range(X_TILES)]
-
-        self.player = Fleet()
-
-        self.current_logic = 'preparation'
-        self.flip_click_logic()
-        self.place_cells()
-
-    def bfs(self, i, j, visited):
-        visited[i][j] = True
-        queue = [(i, j)]
-        cur_x, cur_y, size = None, None, 0
-        while len(queue) > 0:
-            size += 1
-            cur_x, cur_y = queue.pop()
-            for x_shifted, y_shifted in apply_shift(cur_x, cur_y, SHIFTS_HORIZONTAL_VERTICAL):
-                if self.player.taken[x_shifted][y_shifted] and not visited[x_shifted][y_shifted]:
-                    visited[x_shifted][y_shifted] = True
-                    queue.append((x_shifted, y_shifted))
-
-        return size
-
     def check_ships(self):
+        # Проверяю пересечения
         for i in range(X_TILES):
             for j in range(Y_TILES):
-                if self.player.taken[i][j]:
+                if self.taken[i][j]:
                     for i_shifted, j_shifted in apply_shift(i, j, SHIFTS_DIAGONAL):
-                        if self.player.taken[i_shifted][j_shifted]:
+                        if self.taken[i_shifted][j_shifted]:
                             return False
 
                     connection_count = 0
 
                     for i_shifted, j_shifted in apply_shift(i, j, SHIFTS_HORIZONTAL_VERTICAL):
-                        if self.player.taken[i_shifted][j_shifted]:
+                        if self.taken[i_shifted][j_shifted]:
                             connection_count += 1
 
                     if connection_count > 2:
                         return False
                     elif connection_count == 2:
-                        # Проверяю - располагаются ли 2е "соедененные" клетки на одной линии
+                        # Проверяю - стоят ли 2 "соединенные" клетки на одной линии
                         if not ((tile_exists(i + 1, j) and tile_exists(i - 1, j) and
-                                self.player.taken[i + 1][j] and self.player.taken[i - 1][j]) or
+                                self.taken[i + 1][j] and self.taken[i - 1][j]) or
                                 (tile_exists(i, j + 1) and tile_exists(i, j - 1) and
-                                self.player.taken[i][j + 1] and self.player.taken[i][j - 1])):
+                                self.taken[i][j + 1] and self.taken[i][j - 1])):
                             return False
 
+        # Проверяю размеры кораблей
         visited = [[False for _ in range(Y_TILES)] for _ in range(X_TILES)]
+        placed = [[False for _ in range(Y_TILES)] for _ in range(X_TILES)]
         sizes = {}
         for i in range(X_TILES):
             for j in range(Y_TILES):
-                if self.player.taken[i][j] and not visited[i][j]:
+                if self.taken[i][j] and not visited[i][j]:
                     size = self.bfs(i, j, visited)
+                    self.bfs(i, j, placed, change=True, new_size=size)
                     if size in sizes:
                         sizes[size] += 1
                     else:
@@ -175,6 +182,24 @@ class Grid:
                 return False
 
         return sizes[4] == 1 and sizes[3] == 2 and sizes[2] == 3 and sizes[1] == 4
+
+#
+# Игровое поле
+#
+
+
+class Grid:
+    def __init__(self, frame):
+        self.frame = frame
+
+        self.cells = [[tk.Button(master=self.frame, bg=DEFAULT_COLOUR, bd=1)
+                       for _ in range(Y_TILES)] for _ in range(X_TILES)]
+
+        self.player = Fleet()
+
+        self.current_logic = 'preparation'
+        self.flip_click_logic()
+        self.place_cells()
 
     def lock(self):
         for cell_row in self.cells:
@@ -210,7 +235,7 @@ class Grid:
     def place_cells(self):
         for x in range(X_TILES):
             for y in range(Y_TILES):
-                self.cells[x][y].grid(row=x, column=y)
+                self.cells[x][y].grid(row=x, column=y, ipadx=8, ipady=2)
 
     def flip_click_logic(self):
         if self.current_logic == 'default':
