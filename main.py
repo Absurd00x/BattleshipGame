@@ -86,7 +86,7 @@ class MyGUI:
 
     def play(self):
         if not self.over:
-            if not self.player_field.check_ships():
+            if not self.player_field.player.check_ships():
                 messagebox.showerror("Error", "Ships placed inappropriately")
             else:
                 self.player_field.flip_click_logic()
@@ -102,17 +102,16 @@ class MyGUI:
                     self.bot_turn()
 
     def new_game(self):
-        if self.over:
-            self.over = False
+        self.over = False
 
-            self.bot_field.refresh()
-            self.bot_field.lock()
+        self.bot_field.refresh()
+        self.bot_field.lock()
 
-            self.player_field.refresh()
-            self.player_field.show_player()
-            self.player_field.flip_click_logic()
+        self.player_field.refresh()
+        self.player_field.show_player()
+        self.player_field.flip_click_logic()
 
-            self.bot_turn = self.bot_init()
+        self.bot_turn = self.bot_init()
 
     def refresh_stats(self):
         self.player_score_label['text'] = 'Player score: {}'.format(self.stats.player_score)
@@ -133,6 +132,7 @@ class MyGUI:
             answer = 'yes' if messagebox.askyesno("Defeat", "You have been defeated\nRematch?") else 'no'
             if answer == 'yes':
                 self.new_game()
+                self.play()
         self.refresh_stats()
 
     def player_click_logic(self, i, j):
@@ -157,14 +157,14 @@ class MyGUI:
         y = int((screen_height / 2) - (height / 2))
         self.root.geometry('{:d}x{:d}+{:d}+{:d}'.format(width, height, x, y))
 
-    def place_buttons(self):
-        for x, button_row in enumerate(self.buttons_matrix):
-            for y, button in enumerate(button_row):
-                button.grid(padx=0, pady=0, ipadx=0, ipady=0, row=y, column=x)
-
     def config_buttons(self, width, height, border, colour):
         for UI_button in self.UI_buttons.values():
             UI_button.config(width=width, height=height, bd=border, bg=colour)
+
+    def place_buttons(self):
+        for x, button_row in enumerate(self.buttons_matrix):
+            for y, button in enumerate(button_row):
+                button.grid(row=y, column=x)
 
     def finish(self):
         with open(FILE_NAME, 'w') as file:
@@ -227,11 +227,15 @@ class MyGUI:
                                     switch_to_chess_order2 += 1
 
                     if current_order == 2 and switch_to_chess_order1 > switch_to_chess_order2:
-                        confidence_grid += HEURISTIC_CHESS1 - HEURISTIC_CHESS2
+                        for i in range(X_TILES):
+                            for j in range(Y_TILES):
+                                confidence_grid[i][j] += HEURISTIC_CHESS1[i][j] - HEURISTIC_CHESS2[i][j]
                         current_order = 1
 
                     elif current_order == 1 and switch_to_chess_order2 > switch_to_chess_order1:
-                        confidence_grid += HEURISTIC_CHESS2 - HEURISTIC_CHESS1
+                        for i in range(X_TILES):
+                            for j in range(Y_TILES):
+                                confidence_grid[i][j] += HEURISTIC_CHESS2[i][j] - HEURISTIC_CHESS1[i][j]
                         current_order = 2
 
                 maximum_confidence = 0

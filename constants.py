@@ -1,5 +1,3 @@
-from numpy import array as numpy_array
-
 #
 # Window
 #
@@ -72,8 +70,8 @@ HEURISTIC_CENTER = [[(min(i + 1, X_TILES - i, SHIP_TYPES) +
 # x.x.x.x.x.x
 # .x.x.x.x.x.
 # x.x.x.x.x.x
-HEURISTIC_CHESS1 = numpy_array([[((i + j) % 2) * SHIP_TYPES * 2 for j in range(Y_TILES)] for i in range(X_TILES)])
-HEURISTIC_CHESS2 = numpy_array([[((i + j + 1) % 2) * SHIP_TYPES * 2 for j in range(Y_TILES)] for i in range(X_TILES)])
+HEURISTIC_CHESS1 = [[((i + j) % 2) * SHIP_TYPES * 2 for j in range(Y_TILES)] for i in range(X_TILES)]
+HEURISTIC_CHESS2 = [[((i + j + 1) % 2) * SHIP_TYPES * 2 for j in range(Y_TILES)] for i in range(X_TILES)]
 
 #
 # Other
