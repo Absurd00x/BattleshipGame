@@ -193,7 +193,7 @@ class Grid:
     def __init__(self, frame):
         self.frame = frame
 
-        self.cells = [[tk.Button(master=self.frame, bg=DEFAULT_COLOUR, bd=1, width=CELL_WIDTH, height=CELL_HEIGHT)
+        self.cells = [[tk.Button(master=self.frame, bg=DEFAULT_COLOUR, bd=1)
                        for _ in range(Y_TILES)] for _ in range(X_TILES)]
 
         self.player = Fleet()
