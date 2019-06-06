@@ -3,6 +3,7 @@ from constants import *
 from grid import Grid, tile_exists
 from random import randint
 from tkinter import messagebox
+from time import sleep
 
 
 class Statistics:
@@ -141,9 +142,13 @@ class MyGUI:
         if self.bot_field.player.parts_alive == 0:
             self.game_over('player')
         else:
-            self.bot_turn()
-            if self.player_field.player.parts_alive == 0:
-                self.game_over('computer')
+            if self.bot_field.cells[i][j]['bg'] == MISS_COLOUR:
+                current_parts_alive = -1
+                while current_parts_alive != self.player_field.player.parts_alive:
+                    current_parts_alive = self.player_field.player.parts_alive
+                    self.bot_turn()
+                    if self.player_field.player.parts_alive == 0:
+                        self.game_over('computer')
 
     def place_ships(self):
         self.player_field.refresh()
@@ -277,6 +282,7 @@ class MyGUI:
 
                 if confidence_grid[x][y] > 0:
                     self.player_field.click_logic(x, y)
+                    sleep(0.3)
                     shot[x][y] = True
 
                     if self.player_field.cells[x][y]['bg'] == HIT_COLOUR:
