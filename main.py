@@ -87,9 +87,10 @@ class MyGUI:
 
     def play(self):
         if not self.over:
-            if not self.player_field.player.check_ships():
+            if not self.player_field.check_ships():
                 messagebox.showerror("Error", "Ships placed inappropriately")
             else:
+
                 self.player_field.flip_click_logic()
                 self.bot_field.unlock()
                 self.player_field.lock()
@@ -143,12 +144,7 @@ class MyGUI:
             self.game_over('player')
         else:
             if self.bot_field.cells[i][j]['bg'] == MISS_COLOUR:
-                current_parts_alive = -1
-                while current_parts_alive != self.player_field.player.parts_alive:
-                    current_parts_alive = self.player_field.player.parts_alive
-                    self.bot_turn()
-                    if self.player_field.player.parts_alive == 0:
-                        self.game_over('computer')
+                self.bot_turn()
 
     def place_ships(self):
         self.player_field.refresh()
@@ -191,19 +187,15 @@ class MyGUI:
         current_order = randint(1, 2)
         if current_order == 1:
             confidence_grid = [[HEURISTIC_CENTER[i][j] + HEURISTIC_CHESS1[i][j]
-                               for j in range(Y_TILES)]
+                                for j in range(Y_TILES)]
                                for i in range(X_TILES)]
         elif current_order == 2:
             confidence_grid = [[HEURISTIC_CENTER[i][j] + HEURISTIC_CHESS2[i][j]
                                 for j in range(Y_TILES)]
                                for i in range(X_TILES)]
 
-        only_one_sized_ships_left = False
-
-        shot = [[False for _ in range(Y_TILES)] for _ in range(X_TILES)]
-
         def make_turn():
-            nonlocal confidence_grid, current_order, only_one_sized_ships_left, shot
+            nonlocal confidence_grid, current_order
             if self.player_field.player.parts_alive > 0:
                 switch_to_chess_order1 = 0
                 switch_to_chess_order2 = 0
@@ -211,10 +203,14 @@ class MyGUI:
                 # Detecting the biggest ship
                 biggest_ship_size = self.get_biggest_ship_size()
 
-                if biggest_ship_size == 1 and not only_one_sized_ships_left:
+                # If only one-sized ships are left then
+                # I'll recalculate confidence grid:
+                # for each cell where there can be a ship
+                # confidence value will be estimated as number of unshot cells around it
+                if biggest_ship_size == 1:
                     for i in range(X_TILES):
                         for j in range(Y_TILES):
-                            if confidence_grid[i][j] > 0 and not shot[i][j]:
+                            if confidence_grid[i][j] > 0 and self.player_field.cells[i][j]['bg'] != MISS_COLOUR:
                                 new_confidence = 1
 
                                 for i_shifted, j_shifted in apply_shift(i, j, SHIFTS_AROUND):
@@ -223,9 +219,11 @@ class MyGUI:
 
                                 confidence_grid[i][j] = new_confidence
                 else:
+                    # Finding out if it should change chess order
                     for i in range(X_TILES):
                         for j in range(Y_TILES):
-                            if shot[i][j]:
+                            if (self.player_field.cells[i][j]['bg'] == MISS_COLOUR
+                                    or self.player_field.cells[i][j]['bg'] == HIT_COLOUR):
                                 if (i + j + 1) % 2 == 0:
                                     switch_to_chess_order1 += 1
                                 else:
@@ -247,7 +245,8 @@ class MyGUI:
                 answer = (None, None)
                 for i in range(X_TILES):
                     for j in range(Y_TILES):
-                        if not shot[i][j]:
+                        if (self.player_field.cells[i][j]['bg'] != MISS_COLOUR
+                                and self.player_field.cells[i][j]['bg'] != HIT_COLOUR):
                             if confidence_grid[i][j] > maximum_confidence:
                                 answer = (i, j)
                                 maximum_confidence = confidence_grid[i][j]
@@ -274,16 +273,12 @@ class MyGUI:
                                 else:
                                     parts_hit += 1
 
-                        # Detecting the biggest ship
-                        biggest_ship_size = self.get_biggest_ship_size()
-
-                        if parts_hit == SHIP_TYPES or parts_hit >= biggest_ship_size:
+                        if parts_hit >= biggest_ship_size:
                             confidence_grid[x][y] -= X_TILES * Y_TILES * 100
 
                 if confidence_grid[x][y] > 0:
                     self.player_field.click_logic(x, y)
                     sleep(0.3)
-                    shot[x][y] = True
 
                     if self.player_field.cells[x][y]['bg'] == HIT_COLOUR:
                         # Ship can't be placed diagonally
@@ -293,6 +288,10 @@ class MyGUI:
                         # Ship can be placed horizontally or vertically
                         for x_shifted, y_shifted in apply_shift(x, y, SHIFTS_HORIZONTAL_VERTICAL):
                             confidence_grid[x_shifted][y_shifted] += SHIP_TYPES * 4
+                        if self.player_field.player.parts_alive > 0:
+                            make_turn()
+                        else:
+                            self.game_over('computer')
                 else:
                     make_turn()
 
