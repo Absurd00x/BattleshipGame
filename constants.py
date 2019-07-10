@@ -1,12 +1,12 @@
 #
-# Window
+# Главное окно
 #
 
 X_TILES = 10
 Y_TILES = 10
 
-WIDTH = 85 * X_TILES
-HEIGHT = 40 * Y_TILES
+WIDTH = 75 * X_TILES
+HEIGHT = 35 * Y_TILES
 
 STATISTICS_LABEL_X = 0.09
 STATISTICS_LABEL_Y = 0.05
@@ -18,7 +18,7 @@ WINRATE_LABEL_Y = 0.35
 INFO_LABEL_Y = 0.85
 
 #
-# Grid
+# Игровое поле
 #
 
 PLAYER_GRID_X = 0.425
@@ -29,12 +29,16 @@ BELONG_LABEL_Y = 0.9
 PLAYER_LABEL_X = 0.3865
 BOT_LABEL_X = 0.7375
 
+# Эти параметры надо поменять в grid.py в функции place_cells
+CELL_WIDTH = 8
+CELL_HEIGHT = 2
+
 #
-# Button parameters
+# Параметры кнопок
 #
 
 BUTTON_HEIGHT = 3
-BUTTON_WIDTH = 6
+BUTTON_WIDTH = 8
 
 BUTTON_FRAME_X = 0.025
 BUTTON_FRAME_Y = 0.45
@@ -46,7 +50,7 @@ BUTTON_COLOUR = 'Grey'
 BUTTONS_PER_COLUMN = 2
 
 #
-# Ship parameters
+# Параметры корабля
 #
 
 SHIP_TYPES = 4
@@ -60,13 +64,12 @@ SHIP_COLOUR = 'Yellow'
 HIT_COLOUR = 'Red'
 MISS_COLOUR = 'Cyan'
 
-# Number of ways to place the biggest in each cell
-# These values are intentionally put in segment [0, 1]
+# Количество способов поместить самый большой корабль, проходя через эту клетку
 HEURISTIC_CENTER = [[(min(i + 1, X_TILES - i, SHIP_TYPES) +
                      min(j + 1, Y_TILES - j, SHIP_TYPES))
                      for j in range(Y_TILES)] for i in range(X_TILES)]
 
-# This heuristic implements chess-like order. Like this:
+# Эта эвристика вводит шахматный порядок. Вот так:
 # x.x.x.x.x.x
 # .x.x.x.x.x.
 # x.x.x.x.x.x
@@ -74,7 +77,7 @@ HEURISTIC_CHESS1 = [[((i + j) % 2) * SHIP_TYPES * 2 for j in range(Y_TILES)] for
 HEURISTIC_CHESS2 = [[((i + j + 1) % 2) * SHIP_TYPES * 2 for j in range(Y_TILES)] for i in range(X_TILES)]
 
 #
-# Other
+# Прочее
 #
 
 SOLUTION_DELAY = 0.3

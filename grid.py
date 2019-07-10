@@ -154,7 +154,7 @@ class Grid:
     def place_cells(self):
         for x in range(X_TILES):
             for y in range(Y_TILES):
-                self.cells[x][y].grid(row=x, column=y)
+                self.cells[x][y].grid(row=x, column=y, ipadx=CELL_WIDTH, ipady=CELL_HEIGHT)
 
     def flip_click_logic(self):
         if self.current_logic == 'default':
