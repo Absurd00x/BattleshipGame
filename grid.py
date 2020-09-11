@@ -242,6 +242,22 @@ class Grid:
         return size
 
     def check_ships(self):
+        # Checking ship sizes
+        visited = [[False for _ in range(Y_TILES)] for _ in range(X_TILES)]
+        sizes = {}
+        # Also adding existing ships to 'ships' array
+        self.player.ships.clear()
+        self.player.taken = [[0 for _ in range(Y_TILES)] for _ in range(X_TILES)]
+        for i in range(X_TILES):
+            for j in range(Y_TILES):
+                if self.cells[i][j]['bg'] == SHIP_COLOUR and not visited[i][j]:
+                    size = self.bfs(i, j, visited, change=True, new_value=(len(self.player.ships) + 1))
+                    self.player.ships.append(Ship(size))
+                    if size in sizes:
+                        sizes[size] += 1
+                    else:
+                        sizes[size] = 1
+
         # Checking intersections
         for i in range(X_TILES):
             for j in range(Y_TILES):
@@ -261,26 +277,10 @@ class Grid:
                     elif connection_count == 2:
                         # Checking if 2 "connected" tiles lie on a straight line
                         if not ((tile_exists(i + 1, j) and tile_exists(i - 1, j) and
-                                self.player.taken[i + 1][j] and self.player.taken[i - 1][j]) or
+                                 self.player.taken[i + 1][j] and self.player.taken[i - 1][j]) or
                                 (tile_exists(i, j + 1) and tile_exists(i, j - 1) and
-                                self.player.taken[i][j + 1] and self.player.taken[i][j - 1])):
+                                 self.player.taken[i][j + 1] and self.player.taken[i][j - 1])):
                             return False
-
-        # Checking ship sizes
-        visited = [[False for _ in range(Y_TILES)] for _ in range(X_TILES)]
-        sizes = {}
-        # Also adding existing ships to 'ships' array
-        self.player.ships.clear()
-        self.player.taken = [[0 for _ in range(Y_TILES)] for _ in range(X_TILES)]
-        for i in range(X_TILES):
-            for j in range(Y_TILES):
-                if self.cells[i][j]['bg'] == SHIP_COLOUR and not visited[i][j]:
-                    size = self.bfs(i, j, visited, change=True, new_value=(len(self.player.ships) + 1))
-                    self.player.ships.append(Ship(size))
-                    if size in sizes:
-                        sizes[size] += 1
-                    else:
-                        sizes[size] = 1
 
         correct_sizes = {1: False, 2: False, 3: False, 4: False}
 
